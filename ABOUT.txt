@@ -1,0 +1,44 @@
+================================================================================
+CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO CONTROLLER & CHASSIS UNITS)
+================================================================================
+Tên dự án      : JA_MFG_Log_Extractor
+Tên ứng dụng   : Manufacturing Log Extractor (IO & Chassis)
+Phiên bản      : 1.0.0+1
+Ngày phát hành : 2026-09-29
+Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
+
+MÔ TẢ HỆ THỐNG:
+Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xuất và trích xuất báo cáo
+kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
+Seagate Enterprise (IO Controller 2U, Chassis 2U EBOD, Chassis 4U Juno/Oracle).
+
+TÍNH NĂNG NỔI BẬT (v1.0.0):
+1. Hỗ trợ toàn diện 3 chủng loại thiết bị:
+   - IO Controller (`SAF...`): Trích xuất FW.txt (theo đúng vị trí controller ctrla/ctrlb)
+     và VPD.txt (2 phần: gem ebodvpd + customer VPD ID 49).
+   - Chassis 2U (`SGF...`): Trích xuất <SN>.txt gồm 4 khối chuẩn (Midplane structure,
+     Midplane VPD, Customer VPD hex dump và fru_description).
+   - Chassis 4U Juno (`FVB...`): Tự động trích xuất bộ 6 file báo cáo tiêu chuẩn:
+     FW.txt, GETVPD.txt, VER.txt, VPD.txt, Restore Default.txt, Provisioning State.txt.
+2. Cơ chế đồng bộ Timestamp & Khối số dòng:
+   - Tự động ghép cặp chính xác giữa GETVPD và VER cùng chu kỳ test (sai lệch mili-giây).
+   - Bảo toàn khối số dòng chuẩn (|XXXX|) phục vụ kiểm toán và đối soát MES.
+   - Tự động phát hiện và giải nén log lưu trữ (.tar.gz trong enc_logs).
+3. Định tuyến đường dẫn xuất báo cáo thông minh:
+   - Xuất vào thư mục mang tên "SN tương ứng" bên trong thư mục mẹ của log thô.
+   - Cơ chế chống lồng trùng lặp tên thư mục SN (Anti-nesting guard).
+   - Hỗ trợ Windows Extended-Length Path (\\?\) vượt giới hạn 260 ký tự MAX_PATH.
+4. Giao diện CLI Đa Chế Độ & Trình khởi chạy Thích ứng:
+   - Chế độ 1 thư mục đơn lẻ (Single Folder Mode) với nhận diện tự động SN.
+   - Chế độ quét hàng loạt thư mục con (Batch Subfolders Scan).
+   - Chế độ nhập danh sách hàng loạt từ file CSV / TXT.
+   - Tạo file CSV mẫu (mau_danh_sach_log.csv).
+   - Trình khởi chạy Chay_Tool_Log.bat tự động thích ứng: Windows Terminal (wt.exe)
+     -> PowerShell -> CMD.
+
+CÔNG NGHỆ SỬ DỤNG:
+- Ngôn ngữ: Python 3.10+ (Standard Library, Zero-dependency).
+- Giao diện CLI: ANSI Escape Sequences, Windows Console Virtual Terminal Processing.
+- Xử lý nén & bóc tách: tarfile, glob, re, os, csv.
+- Đóng gói: Portable ZIP Package & Ready-to-run Windows Portable Bundle.
+================================================================================
