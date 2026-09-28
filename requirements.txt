@@ -1,0 +1,3 @@
+# JA_MFG_Log_Extractor requires Python 3.10+
+# Zero external dependencies! Uses Python Standard Library only:
+# - os, sys, re, csv, glob, tarfile, argparse, ctypes

@@ -1,0 +1,52 @@
+# ==============================================================================
+# Git Ignore for JA_MFG_Log_Extractor
+# ==============================================================================
+
+# Raw Manufacturing Test Logs & Data folders
+2U/
+2U24/
+4U_Juno/
+4U_Oracle/
+5U_Dell/
+IO/
+JCI/
+archive/
+Claude/
+Office_C2R_Offline/
+OLD/
+verify_*/
+temp_chassis_test.txt
+*.log
+
+# Python Runtime & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+.venv/
+venv/
+env/
+ENV/
+
+# Python Portable Local Working Folder
+MFG_Log_Extractor_PythonPortable/
+python_runtime/
+
+# Release and Distribution Artifacts
+dist/
+dist_pack/
+backup/
+*.zip
+*.tar.gz
+*.7z
+
+# IDE & OS Artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+Desktop.ini
+.DS_Store
