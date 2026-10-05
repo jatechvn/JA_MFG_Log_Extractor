@@ -1,19 +1,15 @@
-TAG=v1.2.0
-TITLE=JA_MFG_Log_Extractor v1.2.0 — Bổ sung hỗ trợ trích xuất 2U PSU DYJW5
+TAG=v1.3.0
+TITLE=JA_MFG_Log_Extractor v1.3.0 — Bổ sung hỗ trợ trích xuất PSU 5U 0R4C4 & Sửa lỗi Batch Scan
 BODY=
-## JA_MFG_Log_Extractor v1.2.0 — Bổ sung hỗ trợ trích xuất 2U PSU DYJW5
+## JA_MFG_Log_Extractor v1.3.0 — Bổ sung hỗ trợ trích xuất PSU 5U 0R4C4 & Sửa lỗi Batch Scan
 
-Bản cập nhật v1.2.0 bổ sung tính năng tự động nhận diện và trích xuất báo cáo tích hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` cho dòng sản phẩm **2U PSU DYJW5** (Dell ME4 Power Supply Unit).
+Bản cập nhật v1.3.0 bổ sung tính năng tự động nhận diện và trích xuất báo cáo tích hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` cho cả 2 dòng sản phẩm nguồn Dell ME4: **PSU 2U DYJW5** và **PSU 5U 0R4C4**, đồng thời khắc phục triệt để lỗi quét thư mục hàng loạt (Batch Subfolders Scan).
 
 ### Điểm nhấn chính:
-- **Tự động nhận diện 2U PSU DYJW5**: Quét nhận dạng chuỗi `DYJW5` và cấu hình `sn_pn_dict` / `psu0` / `PCM 1` tại Step 06 (`write_vpd`) và Step 07 (`vpd_validation`).
-- **Phân định bộ nguồn thông minh**: Tự động ánh xạ Serial Number mục tiêu (`PMV1104029G...`) thành `psu0` (PCM 1) hoặc `psu1` (PCM 2).
-- **Trích xuất báo cáo kết hợp hoàn chỉnh (116 dòng)**:
-  1. *PCM Firmware & VPD CRC* (Step 06 `write_vpd`): 6 dòng thông tin firmware, cấu trúc VPD và mã CRC của cả 2 bộ PCM 1 & PCM 2.
-  2. *VPD Raw Hex Dump* (Step 06 `write_vpd`): 7 dòng hex dump từ bảng đối soát sau nạp VPD (VPD 40 cho `psu0` hoặc VPD 41 cho `psu1`), dải offset `0000:` đến `0050:`.
-  3. *Customer VPD Hex Dump* (Step 07 `vpd_validation`): 16 dòng hex dump của VPD 60 (cho `psu0`) hoặc VPD 61 (cho `psu1`) gồm offset `0000:` đến `0090:`, phân cách dòng trắng và dải `0360:` đến `0390:`.
-  4. *Customer VPD Validation Table* (Step 07 `vpd_validation`): 84 dòng bảng kiểm thử customer VPD từ Step 07 kết thúc tại `result: match` của khối `fru_description`.
-- **Khớp mẫu tham chiếu 100%**: Đã kiểm chứng khớp chính xác từng byte với file mẫu tham chiếu `Controller FW, Drive FW, Serial Number Tracking & Test History.txt`.
+- **Bổ sung hỗ trợ PSU 5U 0R4C4**: Tự động nhận diện dòng nguồn 5U (Part Number `0R4C4`, FRU Description `PWR SPLY,5U,ME4`, I2C bus 32 addr=15h/17h), bóc tách chính xác 116 dòng cho cả `psu0` (PCM 1) và `psu1` (PCM 2) khớp 100% byte-for-byte với mẫu chuẩn.
+- **Tự động nhận diện động chủng loại PSU**: Giao diện và bảng thống kê hiển thị chính xác tên dòng: `PSU 5U (0R4C4)` vs `PSU 2U (DYJW5)`.
+- **Khắc phục lỗi quét Batch Subfolders Scan**: Điều chỉnh logic nhận diện thư mục log trực tiếp để tránh việc thư mục mẹ bị nhận nhầm là trạm log đơn lẻ, cho phép quét tự động toàn bộ thư mục test PSU 5U.
+- **Cập nhật mẫu CSV**: Thêm log mẫu PSU 5U vào `mau_danh_sach_log.csv`.
 
 ### Cài đặt & Sử dụng:
-Giải nén gói `JA_MFG_Log_Extractor_v1.2.0_Windows_x64.zip` và nhấp đúp vào `Chay_Tool_Log.bat`. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
+Giải nén gói `JA_MFG_Log_Extractor_v1.3.0_Windows_x64.zip` và nhấp đúp vào `Chay_Tool_Log.bat`. Xem chi tiết tại `USERGUIDE.md` và `README.md`.

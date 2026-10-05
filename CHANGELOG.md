@@ -7,6 +7,21 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.3.0] - 2026-10-05
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Bổ sung hỗ trợ dòng PSU 5U 0R4C4 (Dell ME4)**:
+  - Tự động nhận diện dòng nguồn 5U (Part Number `0R4C4`, FRU Description `PWR SPLY,5U,ME4`, bus=32 addr=15h/17h).
+  - Trích xuất báo cáo kết hợp hoàn chỉnh `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (đúng 116 dòng) cho cả `PMV...` psu0 (PCM 1) và psu1 (PCM 2) với độ chính xác 100% byte-for-byte.
+  - Phân loại và hiển thị linh hoạt dòng sản phẩm trên giao diện console và bảng tổng hợp: `PSU 5U (0R4C4)` vs `PSU 2U (DYJW5)`.
+- **Sửa lỗi quét thư mục hàng loạt (Batch Folder Scan Fix)**:
+  - Khắc phục sự cố bộ nhận diện thư mục log trực tiếp khiến `scan_parent_folder_for_logs` nhận nhầm thư mục mẹ là trạm log đơn lẻ do tìm kiếm đệ quy `test-results`.
+  - Hỗ trợ quét tự động trơn tru toàn bộ danh mục test log 5U PSU và các dòng thiết bị khác.
+- **Cập nhật File CSV Mẫu**:
+  - Bổ sung đường dẫn mẫu của cả PSU 5U (`0R4C4`) và PSU 2U (`DYJW5`) vào file CSV mẫu (`mau_danh_sach_log.csv`).
+
+---
+
 ## [v1.2.0] - 2026-10-05
 
 ### 🚀 Nâng cấp & Tính năng mới

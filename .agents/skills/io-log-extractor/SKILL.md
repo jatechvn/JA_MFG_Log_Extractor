@@ -19,7 +19,7 @@ This skill provides step-by-step instructions and automated tool support to extr
 - **IOM RPC73 Unit (`SAF...` with VPD 49 containing `RPC73`)**: Dell ME52XX EBOD Canister.
   - Generates 1 combined report file: `FW_VPD.txt` (139 lines).
   - Canister role (`ctrla` / `ctrlb`) is mapped to Step 2 (`/dev/sg1` vs `/dev/sg2`) and Step 7 (VPD 49 hex dump containing target SN).
-- **2U PSU DYJW5 Unit (`PMV...` / `DYJW5`)**: Dell ME4 Power Supply Unit.
+- **PSU Units (`PMV...` / `DYJW5` / `0R4C4`)**: Dell ME4 Power Supply Units (2U DYJW5 & 5U 0R4C4).
   - Generates 1 combined report file: `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 lines).
   - PSU role (`psu0` / `psu1`) is mapped to PCM 1 vs PCM 2, VPD 40/41 hex dump in Step 06 (`write_vpd`), and VPD 60/61 customer validation in Step 07 (`vpd_validation`).
 - **Chassis 2U Unit (`SGF...`)**: Serial numbers starting with `SGF` (e.g., `SGFVN26318361A6`).
@@ -147,6 +147,23 @@ Generates 1 combined report file: `<output_dir>/<target_sn>/FW_VPD.txt` (139 lin
 4. **Customer VPD Validation** (Step 07 `vpd_validation`):
    - Start Marker: `|3893|Checking <controller> customer VPD (ID = 49) ...`
    - End Marker: `|3993|result: match` of the `fru_description` block. Total: 83 lines.
+
+---
+
+### E. PSU Units Extraction (2U DYJW5 & 5U 0R4C4)
+
+Generates 1 combined report file: `<output_dir>/<target_sn>/Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 lines):
+1. **Section 1: PCM Firmware & VPD Structure/CRC** (Step 06 `write_vpd`):
+   - Extract 6 lines starting with `|0250|PCM 1 firmware` down to `|0250|PCM 2 VPD CRC`.
+2. **Section 2: VPD 40/41 Hex Diff Table** (Step 06 `write_vpd`):
+   - Extract header `VPD 40 (1) - PSMI PCM 1 A ...` (or `VPD 41` for `psu1`) and diff hex rows `0000:` to `0050:` (7 lines).
+3. **Section 3: VPD 60/61 Hex Dump** (Step 07 `vpd_validation`):
+   - Extract header `VPD 60 (1) - PSMI PCM 1 Customer ...` (or `VPD 61` for `psu1`).
+   - Extract hex rows `0000:` to `0090:` + blank line + `0360:` to `0390:` (16 lines).
+4. **Section 4: Customer VPD Validation Table** (Step 07 `vpd_validation`):
+   - Start Marker: `|3893|Checking psu0 customer VPD (ID = 60) ...` (or `psu1`, `ID = 61`).
+   - End Marker: `|3993|result: match` of `fru_description`. Total: 84 lines.
+   - Total lines: 6 + 1 + 7 + 1 + 16 + 1 + 84 = 116 lines.
 
 ---
 

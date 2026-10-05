@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -13,7 +13,7 @@
 
 | Chủng loại | Tiền tố SN / Dấu hiệu | File báo cáo xuất ra | Mô tả |
 | :--- | :--- | :--- | :--- |
-| **2U PSU DYJW5** | `PMV...` / `DYJW5` | `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` | Bóc tách tích hợp 4 phần từ Step 06 (`PCM firmware`, `VPD 40/41 hex diff`) và Step 07 (`VPD 60/61 hex dump`, `Customer VPD validation`). Tự động phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2). |
+| **PSU 2U & 5U** | `PMV...` / `DYJW5` / `0R4C4` | `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` | Bóc tách tích hợp 4 phần từ Step 06 (`PCM firmware`, `VPD 40/41 hex diff`) và Step 07 (`VPD 60/61 hex dump`, `Customer VPD validation`). Tự động nhận diện 2U (`DYJW5`) vs 5U (`0R4C4`), tự động phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2). |
 | **IO Controller chuẩn** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
 | **IOM RPC73** | `SAF...` (VPD 49 chứa `RPC73`) | `FW_VPD.txt` | Tự động nhận diện Canister ME52XX EBOD, bóc tách tích hợp 4 phần từ Step 02 (`Canister firmware`, `FW match`) và Step 07 (`VPD 49 hex dump`, `Customer VPD validation`). |
 | **Chassis 2U** | `SGF...` | `<Target_SN>.txt` | Tổng hợp 4 khối dữ liệu VPD (Midplane, CPLD, Customer VPD hex dump, fru_description). |
