@@ -9,7 +9,7 @@ import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 APP_BUILD = "1"
 
 # Enable ANSI escape sequences on Windows console
@@ -1362,13 +1362,26 @@ def run_batch_extraction(batch_items):
 
     print_batch_summary_table(results)
 
+def safe_input(prompt_text="", default=""):
+    """
+    Safely reads input from stdin, returning default on EOFError or exception.
+    Prevents crashing when running in non-interactive/automated/remote pipes.
+    """
+    try:
+        val = input(prompt_text)
+        return val.strip(' "\' \t\r\n')
+    except (EOFError, Exception):
+        print()
+        return default
+
 def get_single_key_choice(prompt_text, valid_keys, default_key="1"):
     """
     Displays prompt_text and gets a single key choice instantly on Windows without waiting for Enter.
     If Enter (\r or \n) is pressed, returns default_key.
+    Gracefully handles non-TTY, pipes, and remote sessions (SSH, WinRM).
     """
     print(prompt_text, end="", flush=True)
-    if sys.platform == 'win32':
+    if sys.platform == 'win32' and sys.stdin.isatty():
         try:
             import msvcrt
             while True:
@@ -1385,9 +1398,20 @@ def get_single_key_choice(prompt_text, valid_keys, default_key="1"):
         except Exception:
             pass
     
-    # Fallback to standard input() if non-win32 or msvcrt fails
-    inp = input().strip(' "\' \t\r\n')
-    return inp if inp in valid_keys else default_key
+    # Fallback to stdin for non-win32, non-tty pipes, or remote sessions
+    try:
+        if not sys.stdin.isatty():
+            line = sys.stdin.readline()
+            if not line:
+                print(f"{default_key} (auto)")
+                return default_key
+            inp = line.strip(' "\' \t\r\n')
+            return inp if inp in valid_keys else default_key
+        inp = input().strip(' "\' \t\r\n')
+        return inp if inp in valid_keys else default_key
+    except (EOFError, Exception):
+        print(f"{default_key}")
+        return default_key
 
 def main():
     parser = argparse.ArgumentParser(description="Trích xuất log sản xuất tự động cho IO (FW.txt, VPD.txt) và Chassis (<SN>.txt).")
@@ -1438,7 +1462,7 @@ def main():
         return
     elif mode_choice == "3":
         print(f"\n{Color.BRIGHT_YELLOW}📌 [Batch CSV Mode] Đọc danh sách từ file CSV/TXT:{Color.RESET}")
-        csv_file_path = input(f"   {Color.CYAN}👉 Nhập đường dẫn file CSV/TXT (Mặc định: mau_danh_sach_log.csv): {Color.RESET}").strip(' "\' \t\r\n')
+        csv_file_path = safe_input(f"   {Color.CYAN}👉 Nhập đường dẫn file CSV/TXT (Mặc định: mau_danh_sach_log.csv): {Color.RESET}")
         if not csv_file_path:
             script_dir = get_script_dir()
             csv_file_path = os.path.join(script_dir, "mau_danh_sach_log.csv")
@@ -1455,10 +1479,13 @@ def main():
         return
     elif mode_choice == "2":
         print(f"\n{Color.BRIGHT_YELLOW}📌 [Batch Subfolders Scan] Quét hàng loạt từ thư mục gốc:{Color.RESET}")
-        parent_dir = input(f"   {Color.CYAN}👉 Nhập đường dẫn thư mục gốc chứa nhiều log: {Color.RESET}").strip(' "\' \t\r\n')
+        parent_dir = safe_input(f"   {Color.CYAN}👉 Nhập đường dẫn thư mục gốc chứa nhiều log: {Color.RESET}")
         while not parent_dir or not os.path.exists(parent_dir):
+            if not sys.stdin.isatty():
+                print(f"   {Color.RED}✖ Thư mục không tồn tại hoặc không hợp lệ: '{parent_dir}'{Color.RESET}")
+                return
             print(f"   {Color.RED}✖ Thư mục không tồn tại. Vui lòng nhập lại!{Color.RESET}")
-            parent_dir = input(f"   {Color.CYAN}👉 Nhập đường dẫn thư mục gốc: {Color.RESET}").strip(' "\' \t\r\n')
+            parent_dir = safe_input(f"   {Color.CYAN}👉 Nhập đường dẫn thư mục gốc: {Color.RESET}")
 
         batch_items = scan_parent_folder_for_logs(parent_dir)
         if not batch_items:
@@ -1472,9 +1499,12 @@ def main():
 
         while True:
             prompt_str = f"{Color.BRIGHT_YELLOW}📌 [1/3] Nhập đường dẫn thư mục log đầu vào (Input Dir):{Color.RESET}\n   {Color.CYAN}👉 {Color.RESET}"
-            input_dir_raw = input(prompt_str).strip(' "\' \t\r\n')
+            input_dir_raw = safe_input(prompt_str)
             if input_dir_raw and os.path.exists(input_dir_raw):
                 break
+            if not sys.stdin.isatty():
+                print(f"   {Color.RED}✖ Thư mục không tồn tại hoặc không hợp lệ: '{input_dir_raw}'{Color.RESET}")
+                return
             print(f"   {Color.RED}✖ Thư mục không tồn tại. Vui lòng kiểm tra lại đường dẫn!{Color.RESET}\n")
 
         input_dir = os.path.abspath(input_dir_raw.strip(' "\' \t\r\n'))
@@ -1509,9 +1539,12 @@ def main():
         else:
             while True:
                 prompt_str = f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Nhập Target Serial Number (VD: SAFVN... hoặc SGFVN...):{Color.RESET}\n   {Color.CYAN}👉 {Color.RESET}"
-                target_sn_raw = input(prompt_str).strip(' "\' \t\r\n')
+                target_sn_raw = safe_input(prompt_str)
                 if target_sn_raw:
                     break
+                if not sys.stdin.isatty():
+                    print(f"   {Color.RED}✖ Target SN không được để trống.{Color.RESET}")
+                    return
                 print(f"   {Color.RED}✖ Target SN không được để trống. Vui lòng nhập lại!{Color.RESET}\n")
 
         target_sn = target_sn_raw.strip(' "\' \t\r\n')
@@ -1520,7 +1553,7 @@ def main():
 
         target_default_dir = default_output_base if os.path.basename(default_output_base.rstrip('\\/')) == target_sn else os.path.join(default_output_base, target_sn)
         prompt_str = f"\n{Color.BRIGHT_YELLOW}📌 [3/3] Nhập thư mục xuất báo cáo (Mặc định: {target_default_dir}):{Color.RESET}\n   {Color.CYAN}👉 Nhấn Enter để dùng mặc định hoặc dán đường dẫn khác: {Color.RESET}"
-        output_dir_raw = input(prompt_str).strip(' "\' \t\r\n')
+        output_dir_raw = safe_input(prompt_str)
         if not output_dir_raw:
             output_dir_raw = default_output_base
             print(f"   {Color.GREEN}➜ Đã chọn mặc định: {target_default_dir}{Color.RESET}")

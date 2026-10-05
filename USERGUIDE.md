@@ -1,4 +1,4 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.3.0
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.3.1
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE) và nhân viên vận hành trạm test.
 
@@ -9,8 +9,9 @@ Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình v�
 Nhấp đúp vào tệp tin **`Chay_Tool_Log.bat`**.
 
 Chương trình sẽ tự động kiểm tra môi trường:
-- Nếu máy có **Windows Terminal (`wt.exe`)**, công cụ sẽ mở trên giao diện Terminal hiện đại.
-- Nếu không có, sẽ tự động chuyển tiếp qua **PowerShell** hoặc **Command Prompt (CMD)** với bộ mã Unicode UTF-8 (`chcp 65001`) và mã màu ANSI.
+- Nếu chạy từ **PowerShell**, **CMD**, hoặc kết nối từ xa (**SSH**, **WinRM**): Chạy trực tiếp trên console hiện tại mà không tạo cửa sổ tiến trình ngầm.
+- Nếu double-click từ **Windows Explorer**: Tự động mở trong **Windows Terminal (`wt.exe`)** nếu có, hoặc tiếp tục trên **CMD**.
+- Bộ mã hiển thị Unicode UTF-8 (`chcp 65001`) và mã màu ANSI tự động kích hoạt.
 - Ưu tiên sử dụng môi trường Python nhúng đi kèm trong thư mục `python_runtime` (nếu có), hoặc dùng Python có sẵn trong biến môi trường Windows.
 
 ---
@@ -21,7 +22,7 @@ Khi khởi động, màn hình menu chính hiển thị 4 lựa chọn:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.3.0  │
+│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.3.1  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:
@@ -94,7 +95,27 @@ Vui lòng chọn chế độ làm việc:
 
 ---
 
-## 4. Xử lý sự cố thường gặp (Troubleshooting)
+## 4. Chạy trực tiếp qua dòng lệnh (CLI / PowerShell / WinRM / SSH)
+
+Công cụ hỗ trợ đầy đủ các tham số dòng lệnh phục vụ tự động hóa và điều khiển từ xa:
+
+### Các cờ lệnh (Options):
+- `--help`: Xem danh sách tham số hướng dẫn.
+- `--csv-file <đường_dẫn_csv>`: Chạy hàng loạt theo file CSV/TXT tự động (headless/background).
+- `--batch-dir <thư_mục_gốc>`: Tự động quét và trích xuất tất cả log con bên trong thư mục gốc.
+- `--input-dir <log_dir> --target-sn <sn> [--output-dir <out_dir>]`: Trích xuất trực tiếp 1 unit cụ thể.
+- `--generate-csv-template`: Tự động tạo tệp `mau_danh_sach_log.csv`.
+
+### Ví dụ chạy từ xa qua WinRM / PowerShell:
+```powershell
+Set-Location 'D:\MFG_Log_Extractor_PythonPortable'
+.\Chay_Tool_Log.bat --csv-file mau_danh_sach_log.csv
+```
+Khi chạy có tham số hoặc trong phiên SSH/WinRM, công cụ tự động vô hiệu hóa lệnh tạm dừng (`pause`) để không làm nghẽn tiến trình tự động hóa.
+
+---
+
+## 5. Xử lý sự cố thường gặp (Troubleshooting)
 
 1. **Lỗi đường dẫn quá dài (> 260 ký tự)**:
    - Công cụ đã tích hợp cơ chế tiền tố mở rộng `\\?\` của Windows. Người dùng không cần cấu hình thêm Registry.

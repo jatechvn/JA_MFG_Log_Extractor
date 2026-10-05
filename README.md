@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -23,7 +23,10 @@
 
 ## 🚀 Tính năng nổi bật
 
-- ⚡ **Khởi chạy thích ứng 1-chạm**: Tự động nhận diện và điều hướng khởi chạy: **Windows Terminal (`wt.exe`) ➔ PowerShell (`powershell.exe`) ➔ Command Prompt (`cmd.exe`)**.
+- ⚡ **Khởi chạy thông minh & Tương thích Remote (WinRM / SSH)**:
+  - Khi chạy từ CLI / PowerShell / WinRM / SSH: Chạy trực tiếp tại shell hiện tại mà không tạo cửa sổ ngầm.
+  - Khi Double-click từ File Explorer: Tự động khởi chạy trong **Windows Terminal (`wt.exe`)** nếu có, hoặc tiếp tục trên **CMD**.
+  - Xử lý an toàn khi stdin bị redirect/pipe, không gặp lỗi EOFError.
 - 🔍 **Đa chế độ làm việc**:
   1. **Single Folder Mode**: Nhập đường dẫn thư mục log 1 máy, tự động quét và đề xuất danh sách SN để chọn 1-chạm.
   2. **Batch Subfolders Scan**: Quét đệ quy toàn bộ thư mục mẹ, tự động bóc tách hàng loạt trạm test.

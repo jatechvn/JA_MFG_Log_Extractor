@@ -1,15 +1,15 @@
-TAG=v1.3.0
-TITLE=JA_MFG_Log_Extractor v1.3.0 — Bổ sung hỗ trợ trích xuất PSU 5U 0R4C4 & Sửa lỗi Batch Scan
+TAG=v1.3.1
+TITLE=JA_MFG_Log_Extractor v1.3.1 — Hỗ trợ thực thi CLI Remote (WinRM/SSH) & Tách biệt không gian lưu trữ
 BODY=
-## JA_MFG_Log_Extractor v1.3.0 — Bổ sung hỗ trợ trích xuất PSU 5U 0R4C4 & Sửa lỗi Batch Scan
+## JA_MFG_Log_Extractor v1.3.1 — Hỗ trợ thực thi CLI Remote (WinRM/SSH) & Tách biệt không gian lưu trữ
 
-Bản cập nhật v1.3.0 bổ sung tính năng tự động nhận diện và trích xuất báo cáo tích hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` cho cả 2 dòng sản phẩm nguồn Dell ME4: **PSU 2U DYJW5** và **PSU 5U 0R4C4**, đồng thời khắc phục triệt để lỗi quét thư mục hàng loạt (Batch Subfolders Scan).
+Bản cập nhật v1.3.1 hoàn thiện khả năng điều khiển tự động hóa từ xa qua mạng (WinRM, SSH, PowerShell Remoting, non-interactive CI), khắc phục triệt để lỗi process bị cô lập, đồng thời di chuyển và chuẩn hóa cấu trúc dự án độc lập với thư mục dữ liệu kiểm thử.
 
 ### Điểm nhấn chính:
-- **Bổ sung hỗ trợ PSU 5U 0R4C4**: Tự động nhận diện dòng nguồn 5U (Part Number `0R4C4`, FRU Description `PWR SPLY,5U,ME4`, I2C bus 32 addr=15h/17h), bóc tách chính xác 116 dòng cho cả `psu0` (PCM 1) và `psu1` (PCM 2) khớp 100% byte-for-byte với mẫu chuẩn.
-- **Tự động nhận diện động chủng loại PSU**: Giao diện và bảng thống kê hiển thị chính xác tên dòng: `PSU 5U (0R4C4)` vs `PSU 2U (DYJW5)`.
-- **Khắc phục lỗi quét Batch Subfolders Scan**: Điều chỉnh logic nhận diện thư mục log trực tiếp để tránh việc thư mục mẹ bị nhận nhầm là trạm log đơn lẻ, cho phép quét tự động toàn bộ thư mục test PSU 5U.
-- **Cập nhật mẫu CSV**: Thêm log mẫu PSU 5U vào `mau_danh_sach_log.csv`.
+- **Tương thích Thực thi Từ xa & CLI**: Trình khởi chạy `Chay_Tool_Log.bat` tự động phát hiện phiên remote (WinRM / SSH / không có `SESSIONNAME`) hoặc các lệnh có đối số CLI để thực thi trực tiếp tại console hiện tại mà không tạo cửa sổ process ngầm bị cô lập (`start ""`).
+- **Tự động hóa không gián đoạn**: Bỏ qua lệnh `pause` khi chạy từ xa hoặc qua tham số CLI (`--help`, `--csv-file`, `--batch-dir`, `--input-dir`), giúp kịch bản tự động hóa và remote CI chạy trơn tru mà không bị nghẽn tiến trình.
+- **Xử lý An toàn Stdin (Pipes / Non-TTY)**: Tích hợp hàm `safe_input` và kiểm tra `sys.stdin.isatty()`, bảo đảm các luồng dữ liệu truyền qua pipe hoặc chạy ngầm không bị crash bởi lỗi EOFError.
+- **Tách biệt Không gian Dự án & Dữ liệu Log**: Di chuyển toàn bộ mã nguồn, tài liệu, kịch bản build và kho lưu trữ Git về workspace dự án riêng biệt (`D:\OS-Software\OneDrive\OpenClaw_Workspace\JA_PROJECT\PROJECT_PY\JA_MFG_Log_Extractor`), giải phóng thư mục `D:\JA_TESTER\LOGS_ANL` để chỉ chứa dữ liệu log và báo cáo kiểm thử.
 
 ### Cài đặt & Sử dụng:
-Giải nén gói `JA_MFG_Log_Extractor_v1.3.0_Windows_x64.zip` và nhấp đúp vào `Chay_Tool_Log.bat`. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
+Giải nén gói `JA_MFG_Log_Extractor_v1.3.1_Windows_x64.zip` và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
