@@ -7,6 +7,23 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.2.0] - 2026-10-05
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Bổ sung hỗ trợ dòng 2U PSU DYJW5 (Dell ME4)**:
+  - Tự động nhận diện cấu hình kiểm thử PSU DYJW5 qua tên thư mục chứa `DYJW5` hoặc qua cấu hình `sn_pn_dict` / `psu0` / `PCM 1` trong Step 07.
+  - Tự động phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2) tương ứng với từng Serial Number mục tiêu (`PMV1104029G...`).
+  - Trích xuất báo cáo kết hợp hoàn chỉnh `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng) khớp 100% byte-for-byte với mẫu xuất xưởng:
+    1. **PCM Firmware & VPD CRC** (Step 06 `write_vpd`): 6 dòng thông tin firmware, cấu trúc VPD và mã băm CRC của cả 2 bộ PCM 1 & PCM 2.
+    2. **VPD Raw Hex Dump** (Step 06 `write_vpd`): Bóc tách bảng hex dump từ bảng so sánh sau nạp VPD (VPD 40 cho `psu0` hoặc VPD 41 cho `psu1`), trích xuất dải offset `0000:` đến `0050:`.
+    3. **Customer VPD Hex Dump** (Step 07 `vpd_validation`): Trích xuất bảng hex dump VPD 60 (cho `psu0`) hoặc VPD 61 (cho `psu1`), trích xuất dải offset `0000:` đến `0090:`, phân cách dòng trắng và dải `0360:` đến `0390:`.
+    4. **Customer VPD Validation Table** (Step 07 `vpd_validation`): 84 dòng bảng kiểm thử customer VPD từ `Checking psu0/psu1 customer VPD` đến dòng `result: match` của thuộc tính `fru_description`.
+- **Nâng cấp Regex Nhận diện Serial Number**:
+  - Bổ sung nhận diện tiền tố Serial Number dòng PSU (`PM[A-Z0-9]{10,}`), cho phép tự động quét và nhận diện đồng thời cả 2 Serial Number PSU (`psu0` và `psu1`) trong tên thư mục log.
+  - Hỗ trợ menu chọn nhanh 1-chạm hiển thị rõ `(psu0 / PCM 1)` và `(psu1 / PCM 2)`.
+
+---
+
 ## [v1.1.0] - 2026-10-05
 
 ### 🚀 Nâng cấp & Tính năng mới

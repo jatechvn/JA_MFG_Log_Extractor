@@ -1,19 +1,23 @@
 ================================================================================
-CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO CONTROLLER & CHASSIS UNITS)
+CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & 2U PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
-Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73 & Chassis)
-Phiên bản      : 1.1.0+2
+Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis & 2U PSU)
+Phiên bản      : 1.2.0+3
 Ngày phát hành : 2026-10-05
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
 Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xuất và trích xuất báo cáo
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
-Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle).
+Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, 2U PSU).
 
-TÍNH NĂNG NỔI BẬT (v1.1.0):
-1. Hỗ trợ toàn diện 4 chủng loại thiết bị:
+TÍNH NĂNG NỔI BẬT (v1.2.0):
+1. Hỗ trợ toàn diện 5 chủng loại thiết bị:
+   - 2U PSU DYJW5 (`PMV...` / `DYJW5`): Trích xuất báo cáo kết hợp
+     `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
+     từ Step 06 (write_vpd) và Step 07 (vpd_validation), tự động phân định psu0 (PCM 1)
+     hoặc psu1 (PCM 2) với các khối VPD 40/41 hex dump và Customer VPD 60/61.
    - IO Controller chuẩn (`SAF...`): Trích xuất FW.txt (theo đúng vị trí controller
      ctrla/ctrlb) và VPD.txt (2 phần: gem ebodvpd + customer VPD ID 49).
    - IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'): Tự động nhận diện và trích xuất
@@ -42,6 +46,6 @@ TÍNH NĂNG NỔI BẬT (v1.1.0):
 CÔNG NGHỆ SỬ DỤNG:
 - Ngôn ngữ: Python 3.10+ (Standard Library, Zero-dependency).
 - Giao diện CLI: ANSI Escape Sequences, Windows Console Virtual Terminal Processing.
-- Xử lý nén & bóc tách: tarfile, glob, re, os, csv.
+- Xử lý nén & bóc tách: tarfile, glob, re, os, csv, ast.
 - Đóng gói: Portable ZIP Package & Ready-to-run Windows Portable Bundle.
 ================================================================================

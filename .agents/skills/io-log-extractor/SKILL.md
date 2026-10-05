@@ -19,6 +19,9 @@ This skill provides step-by-step instructions and automated tool support to extr
 - **IOM RPC73 Unit (`SAF...` with VPD 49 containing `RPC73`)**: Dell ME52XX EBOD Canister.
   - Generates 1 combined report file: `FW_VPD.txt` (139 lines).
   - Canister role (`ctrla` / `ctrlb`) is mapped to Step 2 (`/dev/sg1` vs `/dev/sg2`) and Step 7 (VPD 49 hex dump containing target SN).
+- **2U PSU DYJW5 Unit (`PMV...` / `DYJW5`)**: Dell ME4 Power Supply Unit.
+  - Generates 1 combined report file: `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 lines).
+  - PSU role (`psu0` / `psu1`) is mapped to PCM 1 vs PCM 2, VPD 40/41 hex dump in Step 06 (`write_vpd`), and VPD 60/61 customer validation in Step 07 (`vpd_validation`).
 - **Chassis 2U Unit (`SGF...`)**: Serial numbers starting with `SGF` (e.g., `SGFVN26318361A6`).
   - Generates 1 report file: `<target_sn>.txt`.
 - **Chassis 4U Unit (`FVB...`)**: Serial numbers starting with `FVB` (e.g., `FVBTL0000E`).
