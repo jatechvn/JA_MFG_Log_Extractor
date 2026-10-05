@@ -8,8 +8,8 @@ import tarfile
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO & CHASSIS UNITS)"
-APP_VERSION = "1.0.0"
-APP_BUILD = "1"
+APP_VERSION = "1.1.0"
+APP_BUILD = "2"
 
 # Enable ANSI escape sequences on Windows console
 if sys.platform == 'win32':
@@ -523,7 +523,177 @@ def extract_chassis_4u_logs(input_dir, target_sn, output_base):
         )
     return output_dir, saved_paths
 
+def check_is_iom_rpc73(test_results_dir):
+    """
+    Check if an IO log directory is for IOM RPC73:
+    In step vpd_validation, the block '|0608|VPD 49 (1) - Canister Customer' contains 'RPC73'.
+    """
+    try:
+        vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+        vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+        if os.path.exists(to_long_path(vpd_log_path)):
+            with open(to_long_path(vpd_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            if "VPD 49 (1) - Canister Customer" in content and "RPC73" in content:
+                return True
+    except Exception:
+        pass
+    return False
+
+def find_rpc73_fw_step_dir(test_results_dir):
+    """
+    Locate the check_and_load_fw_test step containing 'Canister firmware' (Step 02).
+    """
+    long_tr = to_long_path(test_results_dir)
+    fw_dirs = [d for d in os.listdir(long_tr) if os.path.isdir(to_long_path(os.path.join(test_results_dir, d))) and 'check_and_load_fw_test' in d]
+    fw_dirs.sort(key=lambda item: int(re.match(r'^(\d+)-', item).group(1)) if re.match(r'^(\d+)-', item) else 0)
+    for d in fw_dirs:
+        full_p = os.path.join(test_results_dir, d)
+        log_p = os.path.join(full_p, "debug.log")
+        if os.path.exists(to_long_path(log_p)):
+            with open(to_long_path(log_p), 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            if "Canister firmware" in content:
+                return full_p
+    return find_step_dir(test_results_dir, "check_and_load_fw_test")
+
+def detect_rpc73_controller_from_vpd(s7_lines, target_sn):
+    """
+    Determine if target_sn corresponds to ctrla or ctrlb by searching VPD 49 hex blocks.
+    """
+    vpd49_starts = [i for i, l in enumerate(s7_lines) if '|0608|VPD 49 (1) - Canister Customer' in l]
+    for start_idx in vpd49_starts:
+        block_snippet = ''.join(s7_lines[start_idx:start_idx+15])
+        if target_sn in block_snippet:
+            for j in range(start_idx-1, max(0, start_idx-25), -1):
+                if 'ctrla customer VPD' in s7_lines[j] or 'device /dev/sg1' in s7_lines[j]:
+                    return 'ctrla'
+                if 'ctrlb customer VPD' in s7_lines[j] or 'device /dev/sg2' in s7_lines[j]:
+                    return 'ctrlb'
+            return 'ctrla' if start_idx == vpd49_starts[0] else 'ctrlb'
+    return None
+
+def extract_iom_rpc73(test_results_dir, target_sn, controller):
+    """
+    Extract combined FW_VPD.txt report for IOM RPC73 units.
+    - Section 1 (Step 2): Canister firmware (9 lines)
+    - Section 2 (Step 2): FW match for controller (30 lines)
+    - Section 3 (Step 7): VPD 49 hex dump (15 lines)
+    - Section 4 (Step 7): Customer VPD validation table (83 lines)
+    """
+    fw_step_dir = find_rpc73_fw_step_dir(test_results_dir)
+    fw_log_path = os.path.join(fw_step_dir, "debug.log")
+    s2_lines = clean_log_lines(fw_log_path)
+
+    vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+    vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+    s7_lines = clean_log_lines(vpd_log_path)
+
+    # Device to controller mapping in Step 2
+    dev_to_ctrl = {}
+    cur_dev = None
+    for l in s2_lines:
+        m_dev = re.search(r'Device:\s*(sg\d+)', l)
+        if m_dev: cur_dev = m_dev.group(1)
+        m_ctrl = re.search(r'Controller ID:\s*([AB])', l)
+        if m_ctrl and cur_dev:
+            c = 'ctrla' if m_ctrl.group(1) == 'A' else 'ctrlb'
+            dev_to_ctrl[cur_dev] = c
+
+    # 1. Section 1: Canister firmware (9 lines)
+    sec1 = []
+    canister_occurrences = []
+    for i, l in enumerate(s2_lines):
+        if re.match(r'^\|0250\|Canister firmware\s*:', l):
+            target_ctrl = None
+            for j in range(i-1, max(0, i-30), -1):
+                m_dev = re.search(r'/dev/(sg\d+)', s2_lines[j])
+                if m_dev:
+                    target_ctrl = dev_to_ctrl.get(m_dev.group(1))
+                    break
+            canister_occurrences.append((target_ctrl, s2_lines[i:i+9]))
+
+    for c, blk in canister_occurrences:
+        if c == controller:
+            sec1 = [line.rstrip('\r\n') for line in blk]
+            break
+    if not sec1 and canister_occurrences:
+        idx = 0 if controller == 'ctrla' else -1
+        sec1 = [line.rstrip('\r\n') for line in canister_occurrences[idx][1]]
+
+    # 2. Section 2: FW match for controller (30 lines)
+    sec2 = []
+    start_sec2 = None
+    for i, l in enumerate(s2_lines):
+        if f'|0573|FW match: Component: {controller}' in l:
+            start_sec2 = i
+            break
+    if start_sec2 is not None:
+        for i in range(start_sec2, len(s2_lines)):
+            l = s2_lines[i].rstrip('\r\n')
+            if '|0573|FW match: Component:' in l and controller not in l:
+                break
+            if '|0589|Files to load:' in l or '|0586|Component FW' in l or '|1117|mismatch:' in l:
+                break
+            sec2.append(l)
+
+    # 3. Section 3: VPD 49 hex dump (15 lines)
+    sec3 = []
+    vpd49_starts = [i for i, l in enumerate(s7_lines) if '|0608|VPD 49 (1) - Canister Customer' in l]
+    for start_idx in vpd49_starts:
+        ctx_ctrl = None
+        for j in range(start_idx-1, max(0, start_idx-25), -1):
+            if 'ctrla customer VPD' in s7_lines[j] or 'device /dev/sg1' in s7_lines[j]:
+                ctx_ctrl = 'ctrla'; break
+            if 'ctrlb customer VPD' in s7_lines[j] or 'device /dev/sg2' in s7_lines[j]:
+                ctx_ctrl = 'ctrlb'; break
+        block_snippet = ''.join(s7_lines[start_idx:start_idx+15])
+        if target_sn in block_snippet or ctx_ctrl == controller:
+            p1 = []
+            for i in range(start_idx, min(start_idx + 30, len(s7_lines))):
+                p1.append(s7_lines[i].rstrip('\r\n'))
+                if '00a0:' in s7_lines[i]: break
+            p2 = []
+            for i in range(start_idx, min(start_idx + 150, len(s7_lines))):
+                l_str = s7_lines[i].rstrip('\r\n')
+                if '0360:' in l_str or '0370:' in l_str:
+                    p2.append(l_str)
+                    if '0370:' in l_str: break
+            sec3 = p1 + p2
+            break
+
+    # 4. Section 4: Customer VPD validation table (83 lines)
+    sec4 = []
+    start_sec4 = None
+    for i, l in enumerate(s7_lines):
+        if f'|3893|Checking {controller} customer VPD (ID = 49) ...' in l:
+            start_sec4 = i
+            break
+    if start_sec4 is not None:
+        in_fru = False
+        for i in range(start_sec4, len(s7_lines)):
+            l = s7_lines[i].rstrip('\r\n')
+            sec4.append(l)
+            if 'name: fru_description' in l or 'FRU Description' in l:
+                in_fru = True
+            if in_fru and 'result: match' in l:
+                break
+
+    # Combine all 4 sections with blank line delimiters
+    result = []
+    result.extend([l + '\n' for l in sec1])
+    result.append('\n')
+    while sec2 and sec2[-1] == '':
+        sec2.pop()
+    result.extend([l + '\n' for l in sec2])
+    result.append('\n')
+    result.extend([l + '\n' for l in sec3])
+    result.append('\n')
+    result.extend([l + '\n' for l in sec4])
+    return result
+
 def write_extracted_file(filepath, lines, trim_last_newline=True):
+
     """
     Write extracted lines to file preserving Windows CRLF line endings.
     """
@@ -710,44 +880,72 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
         }
     else:
         folder_name = os.path.basename(input_dir.rstrip('\\/'))
-        controller = determine_controller(folder_name, target_sn)
-        print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ IO]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}IO (SAF){Color.RESET} │ Controller: {Color.YELLOW}{controller}{Color.RESET}")
+        is_rpc73 = check_is_iom_rpc73(test_results_dir)
 
-        # 1. Process FW.txt
-        fw_step_dir = find_step_dir(test_results_dir, "check_and_load_fw_test")
-        fw_log_path = os.path.join(fw_step_dir, "debug.log")
-        print(f"{Color.BLUE}📂 [FW Log]:{Color.RESET} {Color.GRAY}{fw_log_path}{Color.RESET}")
-        fw_clean_lines = clean_log_lines(fw_log_path)
-        fw_extracted = extract_fw(fw_clean_lines, controller)
+        if is_rpc73:
+            vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+            vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+            detected_ctrl = detect_rpc73_controller_from_vpd(clean_log_lines(vpd_log_path), target_sn)
+            controller = detected_ctrl if detected_ctrl else determine_controller(folder_name, target_sn)
 
-        fw_out_path = os.path.join(out_dir, "FW.txt")
-        write_extracted_file(fw_out_path, fw_extracted, trim_last_newline=True)
-        saved_paths.append(fw_out_path)
-        print(f"{Color.BRIGHT_GREEN}✔ Đã lưu FW.txt ({len(fw_extracted)} dòng) tại:{Color.RESET}")
-        print(f"  {Color.BOLD}{Color.WHITE}➜ {fw_out_path}{Color.RESET}")
+            print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ IOM RPC73]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}IOM RPC73{Color.RESET} │ Controller: {Color.YELLOW}{controller}{Color.RESET}")
 
-        # 2. Process VPD.txt
-        vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
-        vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
-        print(f"{Color.BLUE}📂 [VPD Log]:{Color.RESET} {Color.GRAY}{vpd_log_path}{Color.RESET}")
-        vpd_clean_lines = clean_log_lines(vpd_log_path)
-        vpd_extracted = extract_vpd(vpd_clean_lines, controller)
+            rpc73_lines = extract_iom_rpc73(test_results_dir, target_sn, controller)
+            fw_vpd_out_path = os.path.join(out_dir, "FW_VPD.txt")
+            write_extracted_file(fw_vpd_out_path, rpc73_lines, trim_last_newline=True)
+            saved_paths.append(fw_vpd_out_path)
+            print(f"{Color.BRIGHT_GREEN}✔ Đã lưu FW_VPD.txt ({len(rpc73_lines)} dòng) tại:{Color.RESET}")
+            print(f"  {Color.BOLD}{Color.WHITE}➜ {fw_vpd_out_path}{Color.RESET}")
 
-        vpd_out_path = os.path.join(out_dir, "VPD.txt")
-        write_extracted_file(vpd_out_path, vpd_extracted, trim_last_newline=True)
-        saved_paths.append(vpd_out_path)
-        print(f"{Color.BRIGHT_GREEN}✔ Đã lưu VPD.txt ({len(vpd_extracted)} dòng) tại:{Color.RESET}")
-        print(f"  {Color.BOLD}{Color.WHITE}➜ {vpd_out_path}{Color.RESET}")
+            return {
+                "sn": target_sn,
+                "unit_type": "IOM RPC73",
+                "controller": controller,
+                "status": "SUCCESS",
+                "error": None,
+                "out_dir": out_dir,
+                "paths": saved_paths
+            }
+        else:
+            controller = determine_controller(folder_name, target_sn)
+            print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ IO]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}IO (SAF){Color.RESET} │ Controller: {Color.YELLOW}{controller}{Color.RESET}")
 
-        return {
-            "sn": target_sn,
-            "unit_type": "IO",
-            "controller": controller,
-            "status": "SUCCESS",
-            "error": None,
-            "out_dir": out_dir,
-            "paths": saved_paths
-        }
+            # 1. Process FW.txt
+            fw_step_dir = find_step_dir(test_results_dir, "check_and_load_fw_test")
+            fw_log_path = os.path.join(fw_step_dir, "debug.log")
+            print(f"{Color.BLUE}📂 [FW Log]:{Color.RESET} {Color.GRAY}{fw_log_path}{Color.RESET}")
+            fw_clean_lines = clean_log_lines(fw_log_path)
+            fw_extracted = extract_fw(fw_clean_lines, controller)
+
+            fw_out_path = os.path.join(out_dir, "FW.txt")
+            write_extracted_file(fw_out_path, fw_extracted, trim_last_newline=True)
+            saved_paths.append(fw_out_path)
+            print(f"{Color.BRIGHT_GREEN}✔ Đã lưu FW.txt ({len(fw_extracted)} dòng) tại:{Color.RESET}")
+            print(f"  {Color.BOLD}{Color.WHITE}➜ {fw_out_path}{Color.RESET}")
+
+            # 2. Process VPD.txt
+            vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+            vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+            print(f"{Color.BLUE}📂 [VPD Log]:{Color.RESET} {Color.GRAY}{vpd_log_path}{Color.RESET}")
+            vpd_clean_lines = clean_log_lines(vpd_log_path)
+            vpd_extracted = extract_vpd(vpd_clean_lines, controller)
+
+            vpd_out_path = os.path.join(out_dir, "VPD.txt")
+            write_extracted_file(vpd_out_path, vpd_extracted, trim_last_newline=True)
+            saved_paths.append(vpd_out_path)
+            print(f"{Color.BRIGHT_GREEN}✔ Đã lưu VPD.txt ({len(vpd_extracted)} dòng) tại:{Color.RESET}")
+            print(f"  {Color.BOLD}{Color.WHITE}➜ {vpd_out_path}{Color.RESET}")
+
+            return {
+                "sn": target_sn,
+                "unit_type": "IO",
+                "controller": controller,
+                "status": "SUCCESS",
+                "error": None,
+                "out_dir": out_dir,
+                "paths": saved_paths
+            }
+
 
 def get_script_dir():
     """

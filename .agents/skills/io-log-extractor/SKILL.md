@@ -16,6 +16,9 @@ This skill provides step-by-step instructions and automated tool support to extr
 - **IO Unit (`SAF...`)**: Serial numbers starting with `SAF` (e.g., `SAFVN262883610F`).
   - Generates 2 report files: `FW.txt` and `VPD.txt`.
   - Controller role (`ctrla` / `ctrlb`) is determined by the position of target SN in raw directory name (`[SN1]` = `ctrla`, `[SN2]` = `ctrlb`).
+- **IOM RPC73 Unit (`SAF...` with VPD 49 containing `RPC73`)**: Dell ME52XX EBOD Canister.
+  - Generates 1 combined report file: `FW_VPD.txt` (139 lines).
+  - Canister role (`ctrla` / `ctrlb`) is mapped to Step 2 (`/dev/sg1` vs `/dev/sg2`) and Step 7 (VPD 49 hex dump containing target SN).
 - **Chassis 2U Unit (`SGF...`)**: Serial numbers starting with `SGF` (e.g., `SGFVN26318361A6`).
   - Generates 1 report file: `<target_sn>.txt`.
 - **Chassis 4U Unit (`FVB...`)**: Serial numbers starting with `FVB` (e.g., `FVBTL0000E`).
@@ -123,6 +126,24 @@ Generates 6 report files into `<output_dir>/<target_sn>/`:
 5. **`Provisioning State.txt`**:
    - Locate step directory matching `juno_provisioning_state` inside `job-*/test-results/`.
    - Extract command and output blocks.
+
+---
+
+### D. IOM RPC73 Unit Extraction (`SAF...` with VPD 49 containing `RPC73`)
+
+Generates 1 combined report file: `<output_dir>/<target_sn>/FW_VPD.txt` (139 lines):
+1. **Canister Firmware** (Step 02 `check_and_load_fw_test`):
+   - Locate step directory matching `check_and_load_fw_test` containing `Canister firmware` (Step 02).
+   - Extract 9 lines: from `|0250|Canister firmware` down to `|0250|Canister CPLD` corresponding to target canister (`/dev/sg1` for `ctrla` or `/dev/sg2` for `ctrlb`).
+2. **FW Match** (Step 02 `check_and_load_fw_test`):
+   - Extract 30 lines (6 blocks) starting at `|0573|FW match: Component: <controller>` through `PCD: <val>`.
+3. **VPD 49 Hex Dump** (Step 07 `vpd_validation`):
+   - In step `vpd_validation`, find `|0608|VPD 49 (1) - Canister Customer` matching target canister / SN.
+   - Extract header + hex lines `0000:` through `00a0:` (13 lines).
+   - Append lines `0360:` and `0370:` (2 lines). Total: 15 lines.
+4. **Customer VPD Validation** (Step 07 `vpd_validation`):
+   - Start Marker: `|3893|Checking <controller> customer VPD (ID = 49) ...`
+   - End Marker: `|3993|result: match` of the `fru_description` block. Total: 83 lines.
 
 ---
 
