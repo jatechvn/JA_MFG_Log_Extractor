@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -11,9 +11,10 @@
 
 ## 🎯 Chủng loại thiết bị hỗ trợ
 
-| Chủng loại | Tiền tố SN | File báo cáo xuất ra | Mô tả |
+| Chủng loại | Tiền tố SN / Dấu hiệu | File báo cáo xuất ra | Mô tả |
 | :--- | :--- | :--- | :--- |
-| **IO Controller** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
+| **IO Controller chuẩn** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
+| **IOM RPC73** | `SAF...` (VPD 49 chứa `RPC73`) | `FW_VPD.txt` | Tự động nhận diện Canister ME52XX EBOD, bóc tách tích hợp 4 phần từ Step 02 (`Canister firmware`, `FW match`) và Step 07 (`VPD 49 hex dump`, `Customer VPD validation`). |
 | **Chassis 2U** | `SGF...` | `<Target_SN>.txt` | Tổng hợp 4 khối dữ liệu VPD (Midplane, CPLD, Customer VPD hex dump, fru_description). |
 | **Chassis 4U (Juno)** | `FVB...` | `FW.txt`, `GETVPD.txt`, `VER.txt`, `VPD.txt`, `Restore Default.txt`, `Provisioning State.txt` | Bộ 6 báo cáo toàn diện, đồng bộ timestamp mili-giây giữa GETVPD và VER, bảo toàn khối số dòng `\|XXXX\|`. |
 
@@ -50,7 +51,7 @@ Công cụ sẽ tự động mở giao diện điều khiển màu ANSI và hi�
 python extract_mfg_logs.py
 
 # Chế độ dòng lệnh trực tiếp:
-python extract_mfg_logs.py --input-dir "D:\Path\To\Raw_Log" --target-sn "FVBTL0000E" --output-dir "D:\Path\To\Output"
+python extract_mfg_logs.py --input-dir "D:\Path\To\Raw_Log" --target-sn "SAFVN2640836553" --output-dir "D:\Path\To\Output"
 ```
 
 ---

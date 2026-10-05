@@ -7,6 +7,23 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.1.0] - 2026-10-05
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Bổ sung hỗ trợ dòng IOM RPC73**:
+  - Tự động nhận diện loại log IOM RPC73 khi khối `|0608|VPD 49 (1) - Canister Customer ...` trong bước `vpd_validation` chứa chuỗi `RPC73`.
+  - Tự động bóc tách và tạo báo cáo tích hợp `FW_VPD.txt` gồm 4 phần chuẩn:
+    1. **Canister Firmware**: Bóc tách 9 dòng thông tin Canister firmware (từ `Canister firmware` đến `Canister CPLD`) trong Step 2 (`check_and_load_fw_test`) theo đúng bộ điều khiển `ctrla` (`/dev/sg1`) hoặc `ctrlb` (`/dev/sg2`).
+    2. **FW Match**: Bóc tách 30 dòng (6 khối) đối chiếu firmware PCD trong Step 2 theo đúng component controller tương ứng.
+    3. **VPD 49 Hex Dump**: Trích xuất 15 dòng hex dump của Canister Customer VPD trong Step 7 (`vpd_validation`) gồm header, dải offset `0000:` đến `00a0:`, và 2 dòng `0360:` / `0370:`, tự động ánh xạ đúng Serial Number của canister.
+    4. **Customer VPD Validation**: Trích xuất 83 dòng bảng kiểm thử customer VPD trong Step 7 kết thúc tại `|3993|result: match` của khối `fru_description`.
+- **Cơ chế định vị Step 2 thông minh**:
+  - Tự động quét và chọn đúng bước `check_and_load_fw_test` có chứa thông tin `Canister firmware` (Step 02), loại trừ các bước kiểm tra FW phụ không chứa log canister.
+- **Tự động nhận diện Controller từ VPD 49**:
+  - Cho phép xác định vai trò `ctrla` / `ctrlb` trực tiếp từ dữ liệu Serial Number nhúng trong hex dump của VPD 49, đảm bảo độ chính xác tuyệt đối ngay cả khi cấu trúc tên thư mục bị thay đổi.
+
+---
+
 ## [v1.0.0] - 2026-09-29
 
 ### 🚀 Nâng cấp & Tính năng mới

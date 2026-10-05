@@ -1,4 +1,4 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.0.0
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.1.0
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE) và nhân viên vận hành trạm test.
 
@@ -21,7 +21,7 @@ Khi khởi động, màn hình menu chính hiển thị 4 lựa chọn:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│     CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO & CHASSIS UNITS) - v1.0.0    │
+│     CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO & CHASSIS UNITS) - v1.1.0    │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:
@@ -36,7 +36,7 @@ Vui lòng chọn chế độ làm việc:
 ### Chế độ [1]: Trích xuất 1 thư mục log đơn lẻ (Single Folder Mode)
 - **Bước 1**: Dán hoặc nhập đường dẫn thư mục log raw vào ô nhập. Hỗ trợ kéo thả thư mục vào cửa sổ console.
 - **Bước 2**: Công cụ tự động phân tích tên thư mục:
-  - Nếu là **IO (`SAF...`)**: Hiển thị danh sách các SN tìm thấy kèm vai trò controller (`[1] SAFVN... (ctrla)`, `[2] SAFVN... (ctrlb)`). Chỉ cần nhấn số `1`, `2` hoặc bấm `Enter` để chọn số `1`.
+  - Nếu là **IO (`SAF...`)** hoặc **IOM RPC73**: Hiển thị danh sách các SN tìm thấy kèm vai trò controller (`[1] SAFVN... (ctrla)`, `[2] SAFVN... (ctrlb)`). Chỉ cần nhấn số `1`, `2` hoặc bấm `Enter` để chọn số `1`.
   - Nếu là **Chassis 2U (`SGF...`)** hoặc **Chassis 4U (`FVB...`)**: Tự động nhận diện SN duy nhất, nhấn `Enter` để tiếp tục.
 - **Bước 3**: Nhập thư mục xuất báo cáo (hoặc nhấn `Enter` để sử dụng mặc định là thư mục mang tên `<Target_SN>` trong thư mục mẹ của log).
 
@@ -50,7 +50,7 @@ Vui lòng chọn chế độ làm việc:
 - Cấu trúc file CSV gồm 3 cột:
   ```csv
   LogPath,TargetSN,OutputDir
-  D:\LOGS\rbod_fin2_test_uut0_TD214_SAFVN2628836122_SAFVN262883610F_20260717-053125,SAFVN262883610F,
+  D:\LOGS\jbod_cto_test_uut0_9D57G_SAFVN2640836553_SAFVN264083654F_20261001-063641,SAFVN2640836553,
   D:\LOGS\juno_fin2_test_uut0_J024X1-995_FVBTL0000E_20260912-154742,FVBTL0000E,
   ```
   *(Cột `TargetSN` và `OutputDir` có thể để trống để công cụ tự động nhận diện).*
@@ -62,14 +62,21 @@ Vui lòng chọn chế độ làm việc:
 
 ## 3. Quy cách tệp tin báo cáo sinh ra
 
-### A. Đối với IO Controller (`SAF...`):
+### A. Đối với IO Controller chuẩn (`SAF...`):
 - `FW.txt`: Bóc tách thông tin firmware của controller tương ứng (`ctrla` hoặc `ctrlb`), từ khóa mở đầu `Component FW <ctrl>:rfwd` đến `kmip_bundle_version`.
 - `VPD.txt`: Bóc tách 2 phần gồm bảng cấu trúc ebodvpd (`gem ebodvpd 2`) và bảng chi tiết linh kiện khách hàng (`Checking <ctrl> customer VPD ID = 49`).
 
-### B. Đối với Chassis 2U (`SGF...`):
+### B. Đối với IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'):
+- Tự động nhận diện và tạo duy nhất 1 tệp tin báo cáo tổng hợp: **`FW_VPD.txt`** (139 dòng) gồm 4 phần:
+  1. *Canister Firmware*: 9 dòng thông tin FW Canister (`Canister firmware` ... `Canister CPLD`) từ Step 02 (`check_and_load_fw_test`) theo đúng controller (`/dev/sg1` cho `ctrla` hoặc `/dev/sg2` cho `ctrlb`).
+  2. *FW Match*: 30 dòng đối chiếu FW PCD của controller tương ứng từ Step 02.
+  3. *VPD 49 Hex Dump*: 15 dòng hex dump của Canister Customer VPD từ Step 07 (`vpd_validation`) gồm header, offset `0000:` đến `00a0:`, và 2 dòng `0360:` / `0370:`, khớp với Serial Number của Canister.
+  4. *Customer VPD Validation*: 83 dòng bảng kiểm thử customer VPD từ Step 07 kết thúc tại `result: match` của khối `fru_description`.
+
+### C. Đối với Chassis 2U (`SGF...`):
 - `<SN>.txt`: Tổng hợp 4 khối tiêu chuẩn: Cấu trúc Midplane VPD, Midplane CRC/CPLD, Mã hex Customer VPD và thông tin `fru_description`.
 
-### C. Đối với Chassis 4U Juno (`FVB...`):
+### D. Đối với Chassis 4U Juno (`FVB...`):
 - `FW.txt`: Thông tin firmware controller A và controller B đã làm sạch biến thời gian.
 - `GETVPD.txt`: Nội dung lệnh `gemcli getvpd` đã ghép nối đúng chu kỳ test.
 - `VER.txt`: Nội dung lệnh `gemcli ver` có cùng tiền tố timestamp với GETVPD.
@@ -85,3 +92,5 @@ Vui lòng chọn chế độ làm việc:
    - Công cụ đã tích hợp cơ chế tiền tố mở rộng `\\?\` của Windows. Người dùng không cần cấu hình thêm Registry.
 2. **Không thấy file `uut_list_utility_logs.log`**:
    - Nếu thư mục log chỉ có file nén `obmcdump_*.tar.gz`, công cụ sẽ tự động giải nén trong bộ nhớ tạm thời mà không yêu cầu cài đặt thêm phần mềm nén ngoài như 7-Zip hay WinRAR.
+3. **Phân biệt Controller cho IOM RPC73**:
+   - Công cụ tự động đối soát Serial Number nhúng trực tiếp trong hex dump của VPD 49 để định danh chính xác Canister A (`ctrla`) và Canister B (`ctrlb`).
