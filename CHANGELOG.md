@@ -7,6 +7,22 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.3.1] - 2026-10-06
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Tương thích Thực thi Từ xa & Môi trường Headless (WinRM / SSH / CI)**:
+  - Nâng cấp kịch bản khởi chạy `Chay_Tool_Log.bat`: Tự động nhận diện phiên làm việc từ xa (WinRM, SSH, PowerShell Remoting, non-interactive CI), thực thi trực tiếp tại console hiện tại mà không tạo cửa sổ process ngầm bị cô lập (`start ""`).
+  - Loại bỏ hoàn toàn sự cố thoát đột ngột (zero output) khi chạy `.\Chay_Tool_Log.bat` qua WinRM/SSH trên máy trạm Windows Server/Windows 10/11 xưởng.
+  - Tự động bỏ qua lệnh `pause` khi chạy có tham số CLI hoặc trong phiên remote/không có desktop session (`SESSIONNAME`).
+- **Xử lý An toàn Dòng Nhập Stdin & Ngăn ngừa EOFError**:
+  - Tích hợp hàm `safe_input` và kiểm tra `sys.stdin.isatty()` cho cơ chế chọn phím nhanh `get_single_key_choice`.
+  - Hỗ trợ truyền dữ liệu qua đường ống (piped input, vd: `echo 4 | Chay_Tool_Log.bat`), tự động chọn mặc định khi gặp EOF mà không crash.
+- **Tách biệt và Chuẩn hóa Cấu trúc Dự án**:
+  - Di chuyển toàn bộ mã nguồn, tài liệu, kịch bản đóng gói và lịch sử Git sang workspace phát triển chuyên dụng (`D:\OS-Software\OneDrive\OpenClaw_Workspace\JA_PROJECT\PROJECT_PY\JA_MFG_Log_Extractor`).
+  - Giải phóng thư mục dữ liệu sản xuất `D:\JA_TESTER\LOGS_ANL`, chỉ lưu trữ dữ liệu log thô và báo cáo trích xuất theo đúng nghiệp vụ kiểm thử.
+
+---
+
 ## [v1.3.0] - 2026-10-05
 
 ### 🚀 Nâng cấp & Tính năng mới

@@ -3,8 +3,8 @@ CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
 Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis & PSU 2U/5U)
-Phiên bản      : 1.3.0+1
-Ngày phát hành : 2026-10-05
+Phiên bản      : 1.3.1+1
+Ngày phát hành : 2026-10-06
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
@@ -12,7 +12,7 @@ Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xu�
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
 Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, PSU 2U DYJW5 & PSU 5U 0R4C4).
 
-TÍNH NĂNG NỔI BẬT (v1.3.0):
+TÍNH NĂNG NỔI BẬT (v1.3.1):
 1. Hỗ trợ toàn diện 6 chủng loại thiết bị:
    - PSU 5U 0R4C4 (`PMV...` / `0R4C4`): Trích xuất báo cáo kết hợp
      `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
@@ -38,13 +38,17 @@ TÍNH NĂNG NỔI BẬT (v1.3.0):
    - Xuất vào thư mục mang tên "SN tương ứng" bên trong thư mục mẹ của log thô.
    - Cơ chế chống lồng trùng lặp tên thư mục SN (Anti-nesting guard).
    - Hỗ trợ Windows Extended-Length Path (\\?\) vượt giới hạn 260 ký tự MAX_PATH.
-4. Giao diện CLI Đa Chế Độ & Trình khởi chạy Thích ứng:
+4. Giao diện CLI Đa Chế Độ & Khả năng Thực thi Từ xa (WinRM / SSH):
    - Chế độ 1 thư mục đơn lẻ (Single Folder Mode) với nhận diện tự động SN.
    - Chế độ quét hàng loạt thư mục con (Batch Subfolders Scan).
    - Chế độ nhập danh sách hàng loạt từ file CSV / TXT.
    - Tạo file CSV mẫu (mau_danh_sach_log.csv).
-   - Trình khởi chạy Chay_Tool_Log.bat tự động thích ứng: Windows Terminal (wt.exe)
-     -> PowerShell -> CMD.
+   - Trình khởi chạy Chay_Tool_Log.bat tự động thích ứng môi trường console, WinRM,
+     SSH, non-interactive CI, chạy trực tiếp tại console mà không tạo process tách biệt.
+   - An toàn tuyệt đối với stdin redirected/pipes, ngăn ngừa lỗi EOFError.
+5. Tách biệt không gian lưu trữ:
+   - Toàn bộ mã nguồn, tài liệu, kịch bản build độc lập trong workspace dự án.
+   - Thư mục dữ liệu sản xuất (D:\JA_TESTER\LOGS_ANL) được giải phóng, chỉ chứa log và báo cáo.
 
 CÔNG NGHỆ SỬ DỤNG:
 - Ngôn ngữ: Python 3.10+ (Standard Library, Zero-dependency).
