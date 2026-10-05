@@ -9,8 +9,8 @@ import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.2.0"
-APP_BUILD = "3"
+APP_VERSION = "1.3.0"
+APP_BUILD = "1"
 
 # Enable ANSI escape sequences on Windows console
 if sys.platform == 'win32':
@@ -693,12 +693,12 @@ def extract_iom_rpc73(test_results_dir, target_sn, controller):
     result.extend([l + '\n' for l in sec4])
     return result
 
-def check_is_psu_dyjw5(test_results_dir, folder_name=""):
+def check_is_psu(test_results_dir, folder_name=""):
     """
-    Check if a test log directory is for 2U PSU DYJW5:
-    Folder name contains DYJW5, or Step 07/06 contains DYJW5 and psu0/PCM 1.
+    Check if a test log directory is for a PSU unit (2U DYJW5, 5U 0R4C4, etc.):
+    Folder name contains DYJW5, 0R4C4, or Step 07/06 contains PSMI/PCM/DYJW5/0R4C4.
     """
-    if "DYJW5" in folder_name:
+    if "DYJW5" in folder_name or "0R4C4" in folder_name:
         return True
     try:
         vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
@@ -706,11 +706,40 @@ def check_is_psu_dyjw5(test_results_dir, folder_name=""):
         if os.path.exists(to_long_path(vpd_log_path)):
             with open(to_long_path(vpd_log_path), 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read(30000)
-            if "DYJW5" in content and ("psu0" in content or "PCM 1" in content):
+            if ("DYJW5" in content or "0R4C4" in content or "PWR SPLY" in content) and ("psu0" in content or "PCM 1" in content or "PSMI" in content):
                 return True
     except Exception:
         pass
     return False
+
+check_is_psu_dyjw5 = check_is_psu
+
+def detect_psu_model_info(test_results_dir, folder_name=""):
+    """
+    Detect PSU model and return (short_tag, full_display_name).
+    Examples:
+      ("PSU 5U", "PSU 5U (0R4C4)")
+      ("PSU 2U", "PSU 2U (DYJW5)")
+    """
+    if "0R4C4" in folder_name:
+        return "PSU 5U", "PSU 5U (0R4C4)"
+    if "DYJW5" in folder_name:
+        return "PSU 2U", "PSU 2U (DYJW5)"
+
+    try:
+        vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+        vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+        if os.path.exists(to_long_path(vpd_log_path)):
+            with open(to_long_path(vpd_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read(30000)
+            if "0R4C4" in content or "PWR SPLY,5U" in content:
+                return "PSU 5U", "PSU 5U (0R4C4)"
+            if "DYJW5" in content or "PWR SPLY,2U" in content:
+                return "PSU 2U", "PSU 2U (DYJW5)"
+    except Exception:
+        pass
+
+    return "PSU", "PSU"
 
 def detect_psu_unit_id(s7_lines, target_sn):
     """
@@ -741,9 +770,9 @@ def detect_psu_unit_id(s7_lines, target_sn):
             return "psu1"
     return "psu0"
 
-def extract_psu_dyjw5(test_results_dir, target_sn):
+def extract_psu_logs(test_results_dir, target_sn):
     """
-    Extract 'Controller FW, Drive FW, Serial Number Tracking & Test History.txt' for PSU DYJW5.
+    Extract 'Controller FW, Drive FW, Serial Number Tracking & Test History.txt' for PSU units (2U & 5U).
     - Section 1 (Step 6/7): PCM 1 & 2 firmware, VPD structure, and VPD CRC (6 lines)
     - Section 2 (Step 6): VPD 40 (psu0) or VPD 41 (psu1) hex dump (0000: to 0050:)
     - Section 3 (Step 7): VPD 60 (psu0) or VPD 61 (psu1) hex dump (0000: to 0090: + blank line + 0360: to 0390:)
@@ -836,6 +865,8 @@ def extract_psu_dyjw5(test_results_dir, target_sn):
     combined = pcm_fw + [""] + s2_lines + [""] + s3_lines + [""] + s4_lines
     out_lines = [l + "\n" for l in combined]
     return out_lines, unit_id
+
+extract_psu_dyjw5 = extract_psu_logs
 
 def write_extracted_file(filepath, lines, trim_last_newline=True):
 
@@ -1027,13 +1058,14 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
         }
     else:
         folder_name = os.path.basename(input_dir.rstrip('\\/'))
-        is_psu = target_sn.startswith("PM") or "DYJW5" in folder_name or check_is_psu_dyjw5(test_results_dir, folder_name)
+        is_psu = target_sn.startswith("PM") or "DYJW5" in folder_name or "0R4C4" in folder_name or check_is_psu(test_results_dir, folder_name)
         is_rpc73 = check_is_iom_rpc73(test_results_dir)
 
         if is_psu:
-            out_lines, unit_id = extract_psu_dyjw5(test_results_dir, target_sn)
+            psu_short, psu_full = detect_psu_model_info(test_results_dir, folder_name)
+            out_lines, unit_id = extract_psu_logs(test_results_dir, target_sn)
             pcm_name = "PCM 1" if unit_id == "psu0" else "PCM 2"
-            print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ 2U PSU DYJW5]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}2U PSU (DYJW5){Color.RESET} │ Unit: {Color.YELLOW}{unit_id} ({pcm_name}){Color.RESET}")
+            print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ {psu_short.upper()}]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}{psu_full}{Color.RESET} │ Unit: {Color.YELLOW}{unit_id} ({pcm_name}){Color.RESET}")
 
             psu_report_name = "Controller FW, Drive FW, Serial Number Tracking & Test History.txt"
             psu_out_path = os.path.join(out_dir, psu_report_name)
@@ -1044,7 +1076,7 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
 
             return {
                 "sn": target_sn,
-                "unit_type": "PSU DYJW5",
+                "unit_type": psu_short,
                 "controller": unit_id,
                 "status": "SUCCESS",
                 "error": None,
@@ -1137,6 +1169,7 @@ def generate_sample_csv(output_csv_path="mau_danh_sach_log.csv"):
 
     sample_content = [
         ["LogPath", "TargetSN", "OutputBaseDir (De trong = Mac dinh thu muc me cua LogPath)"],
+        [r"D:\JA_TESTER\LOGS_ANL\5U_PSU\jbod_cto_test_uut0_0R4C4_PMV1104546G0016_PMV1104546G0017_20261005-134529", "PMV1104546G0016", ""],
         [r"D:\JA_TESTER\LOGS_ANL\2U_PSU\jbod_cto_test_uut0_DYJW5_PMV1104029G007D_PMV1104029G007K_20261003-142309", "PMV1104029G007D", ""],
         [r"D:\JA_TESTER\LOGS_ANL\4U_Juno\FVBTL0000E_RAW\juno_fin2_test_uut0_J024X1-995_FVBTL0000E_20260912-154742", "FVBTL0000E", ""],
         [r"D:\JA_TESTER\LOGS_ANL\2U24\jbod_cto_test_uut0_NP0W0_SGFVN2632836201_20260808-164852", "SGFVN2632836201", ""],
@@ -1193,15 +1226,24 @@ def scan_parent_folder_for_logs(parent_folder):
 
     found_items = []
     
-    # Check if parent_folder itself is a raw log directory
-    is_self_log = False
-    try:
-        find_test_results_dir(abs_parent)
-        is_self_log = True
-    except FileNotFoundError:
-        pass
+    def check_is_direct_log_unit(path):
+        abs_p = os.path.abspath(path)
+        long_p = to_long_path(abs_p)
+        if os.path.basename(abs_p) == 'test-results' and os.path.isdir(long_p):
+            return True
+        if os.path.isdir(os.path.join(long_p, 'test-results')):
+            return True
+        if os.path.isdir(os.path.join(long_p, 'latest', 'test-results')):
+            return True
+        try:
+            for item in os.listdir(long_p):
+                if item.startswith('job-') and os.path.isdir(os.path.join(long_p, item, 'test-results')):
+                    return True
+        except Exception:
+            pass
+        return False
 
-    if is_self_log:
+    if check_is_direct_log_unit(abs_parent):
         target_dirs = [abs_parent]
     else:
         target_dirs = []
@@ -1311,7 +1353,7 @@ def run_batch_extraction(batch_items):
             print(f"  {Color.RED}✖ Lỗi khi trích xuất SN {target_sn}: {e}{Color.RESET}")
             results.append({
                 "sn": target_sn,
-                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis" if target_sn.startswith("SGF") else ("PSU DYJW5" if target_sn.startswith("PM") else "IO")),
+                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else "IO")),
                 "controller": "-",
                 "status": "FAIL",
                 "error": str(e),

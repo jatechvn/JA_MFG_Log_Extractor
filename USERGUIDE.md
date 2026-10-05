@@ -1,4 +1,4 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.1.0
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.3.0
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE) và nhân viên vận hành trạm test.
 
@@ -21,7 +21,7 @@ Khi khởi động, màn hình menu chính hiển thị 4 lựa chọn:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│     CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO & CHASSIS UNITS) - v1.1.0    │
+│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.3.0  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:
@@ -36,7 +36,7 @@ Vui lòng chọn chế độ làm việc:
 ### Chế độ [1]: Trích xuất 1 thư mục log đơn lẻ (Single Folder Mode)
 - **Bước 1**: Dán hoặc nhập đường dẫn thư mục log raw vào ô nhập. Hỗ trợ kéo thả thư mục vào cửa sổ console.
 - **Bước 2**: Công cụ tự động phân tích tên thư mục:
-  - Nếu là **2U PSU DYJW5 (`PMV...`)**: Hiển thị danh sách các SN tìm thấy kèm vị trí PSU (`[1] PMV... (psu0 / PCM 1)`, `[2] PMV... (psu1 / PCM 2)`).
+  - Nếu là **PSU 2U/5U (`PMV...`)**: Hiển thị danh sách các SN tìm thấy kèm vị trí PSU (`[1] PMV... (psu0 / PCM 1)`, `[2] PMV... (psu1 / PCM 2)`).
   - Nếu là **IO (`SAF...`)** hoặc **IOM RPC73**: Hiển thị danh sách các SN tìm thấy kèm vai trò controller (`[1] SAFVN... (ctrla)`, `[2] SAFVN... (ctrlb)`). Chỉ cần nhấn số `1`, `2` hoặc bấm `Enter` để chọn số `1`.
   - Nếu là **Chassis 2U (`SGF...`)** hoặc **Chassis 4U (`FVB...`)**: Tự động nhận diện SN duy nhất, nhấn `Enter` để tiếp tục.
 - **Bước 3**: Nhập thư mục xuất báo cáo (hoặc nhấn `Enter` để sử dụng mặc định là thư mục mang tên `<Target_SN>` trong thư mục mẹ của log).

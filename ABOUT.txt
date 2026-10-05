@@ -1,20 +1,23 @@
 ================================================================================
-CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & 2U PSU UNITS)
+CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
-Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis & 2U PSU)
-Phiên bản      : 1.2.0+3
+Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis & PSU 2U/5U)
+Phiên bản      : 1.3.0+1
 Ngày phát hành : 2026-10-05
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
 Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xuất và trích xuất báo cáo
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
-Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, 2U PSU).
+Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, PSU 2U DYJW5 & PSU 5U 0R4C4).
 
-TÍNH NĂNG NỔI BẬT (v1.2.0):
-1. Hỗ trợ toàn diện 5 chủng loại thiết bị:
-   - 2U PSU DYJW5 (`PMV...` / `DYJW5`): Trích xuất báo cáo kết hợp
+TÍNH NĂNG NỔI BẬT (v1.3.0):
+1. Hỗ trợ toàn diện 6 chủng loại thiết bị:
+   - PSU 5U 0R4C4 (`PMV...` / `0R4C4`): Trích xuất báo cáo kết hợp
+     `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
+     với I2C bus 32 addr=15h (PCM 1 / psu0) và addr=17h (PCM 2 / psu1).
+   - PSU 2U DYJW5 (`PMV...` / `DYJW5`): Trích xuất báo cáo kết hợp
      `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
      từ Step 06 (write_vpd) và Step 07 (vpd_validation), tự động phân định psu0 (PCM 1)
      hoặc psu1 (PCM 2) với các khối VPD 40/41 hex dump và Customer VPD 60/61.
