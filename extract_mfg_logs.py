@@ -5,11 +5,12 @@ import csv
 import argparse
 import glob
 import tarfile
+import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
-APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO & CHASSIS UNITS)"
-APP_VERSION = "1.1.0"
-APP_BUILD = "2"
+APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
+APP_VERSION = "1.2.0"
+APP_BUILD = "3"
 
 # Enable ANSI escape sequences on Windows console
 if sys.platform == 'win32':
@@ -692,6 +693,150 @@ def extract_iom_rpc73(test_results_dir, target_sn, controller):
     result.extend([l + '\n' for l in sec4])
     return result
 
+def check_is_psu_dyjw5(test_results_dir, folder_name=""):
+    """
+    Check if a test log directory is for 2U PSU DYJW5:
+    Folder name contains DYJW5, or Step 07/06 contains DYJW5 and psu0/PCM 1.
+    """
+    if "DYJW5" in folder_name:
+        return True
+    try:
+        vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+        vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+        if os.path.exists(to_long_path(vpd_log_path)):
+            with open(to_long_path(vpd_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read(30000)
+            if "DYJW5" in content and ("psu0" in content or "PCM 1" in content):
+                return True
+    except Exception:
+        pass
+    return False
+
+def detect_psu_unit_id(s7_lines, target_sn):
+    """
+    Detect whether target_sn belongs to psu0 (PCM 1) or psu1 (PCM 2).
+    Returns 'psu0' or 'psu1'.
+    """
+    for line in s7_lines:
+        if "PARAMS (key=sn_pn_dict" in line:
+            m = re.search(r'=>\s*"(.*)"', line)
+            if m:
+                dict_str = m.group(1).replace("\\'", "'")
+                try:
+                    d = ast.literal_eval(dict_str)
+                    for k in ["psu0", "psu1"]:
+                        if target_sn in str(d.get(k, "")):
+                            return k
+                except Exception:
+                    pass
+    # Fallback to validation block search
+    psu1_start = None
+    for i, line in enumerate(s7_lines):
+        if "Checking psu1 customer VPD" in line:
+            psu1_start = i
+            break
+    if psu1_start is not None:
+        psu1_content = "\n".join(s7_lines[psu1_start:])
+        if target_sn in psu1_content:
+            return "psu1"
+    return "psu0"
+
+def extract_psu_dyjw5(test_results_dir, target_sn):
+    """
+    Extract 'Controller FW, Drive FW, Serial Number Tracking & Test History.txt' for PSU DYJW5.
+    - Section 1 (Step 6/7): PCM 1 & 2 firmware, VPD structure, and VPD CRC (6 lines)
+    - Section 2 (Step 6): VPD 40 (psu0) or VPD 41 (psu1) hex dump (0000: to 0050:)
+    - Section 3 (Step 7): VPD 60 (psu0) or VPD 61 (psu1) hex dump (0000: to 0090: + blank line + 0360: to 0390:)
+    - Section 4 (Step 7): Customer VPD validation table (84 lines)
+    """
+    s6_dir = find_step_dir(test_results_dir, "write_vpd")
+    s7_dir = find_step_dir(test_results_dir, "vpd_validation")
+
+    with open(to_long_path(os.path.join(s6_dir, "debug.log")), 'r', encoding='utf-8', errors='ignore') as f:
+        s6 = [l.rstrip('\r\n') for l in f]
+
+    with open(to_long_path(os.path.join(s7_dir, "debug.log")), 'r', encoding='utf-8', errors='ignore') as f:
+        s7 = [l.rstrip('\r\n') for l in f]
+
+    unit_id = detect_psu_unit_id(s7, target_sn)
+    pcm_num = "1" if unit_id == "psu0" else "2"
+    vpd_raw_id = "40" if unit_id == "psu0" else "41"
+    vpd_cust_id = "60" if unit_id == "psu0" else "61"
+
+    # Section 1: PCM firmware & VPD CRC (6 lines)
+    pcm_fw = []
+    for l in s6:
+        if "|0250|PCM " in l:
+            idx = l.find("|0250|PCM ")
+            pcm_fw.append(l[idx:])
+            if len(pcm_fw) == 6:
+                break
+
+    # Section 2: VPD 40 / 41 from Step 6 diff table (0000: to 0050:)
+    s2_lines = []
+    target_v4x_hdr = f"VPD {vpd_raw_id} (1) - PSMI PCM {pcm_num} A"
+    in_v4x = False
+    for l in s6:
+        if target_v4x_hdr in l and ("|" in l or "+" in l):
+            parts = re.split(r'\s+[|+]\s+', l)
+            s2_lines.append(parts[0].strip())
+            in_v4x = True
+            continue
+        if in_v4x:
+            if re.search(r'^\d{4}:', l.strip()):
+                parts = re.split(r'\s+[|+]\s+', l)
+                s2_lines.append(parts[0].rstrip())
+                if parts[0].startswith("0050:"):
+                    break
+
+    # Section 3: VPD 60 / 61 hex from Step 7 (0000: to 0090: + blank line + 0360: to 0390:)
+    s3_lines = []
+    target_v6x_hdr_marker = f"|0608|VPD {vpd_cust_id} (1) - PSMI PCM {pcm_num} Customer"
+    in_v6x = False
+    cust_header = ""
+    for l in s7:
+        if target_v6x_hdr_marker in l:
+            idx = l.find(f"VPD {vpd_cust_id} (1)")
+            cust_header = l[idx:].strip()
+            s3_lines.append(cust_header)
+            in_v6x = True
+            continue
+        if in_v6x:
+            m = re.search(r'\|0509\|(\d{4}:.+)$', l)
+            if m:
+                hex_part = m.group(1).rstrip()
+                addr = hex_part[:4]
+                if addr in [f"{x:04x}" for x in range(0, 0xa0, 0x10)]:
+                    s3_lines.append(hex_part)
+                    if addr == "0090":
+                        s3_lines.append("")
+                elif addr in ["0360", "0370", "0380", "0390"]:
+                    s3_lines.append(hex_part)
+                    if addr == "0390":
+                        break
+
+    # Section 4: Customer VPD validation table from Step 7
+    s4_lines = [cust_header]
+    in_val = False
+    val_marker = f"|3893|Checking {unit_id} customer VPD"
+    for l in s7:
+        if val_marker in l:
+            idx = l.find(f"|3893|Checking {unit_id}")
+            s4_lines.append(l[idx:])
+            in_val = True
+            continue
+        if in_val:
+            m = re.search(r'\|(\d{4})\|(.*)$', l)
+            if m:
+                s4_lines.append(f"|{m.group(1)}|{m.group(2)}")
+                if m.group(1) == "3993" and "fru_description" in "\n".join(s4_lines[-10:]):
+                    break
+
+    # Combine with blank lines
+    combined = pcm_fw + [""] + s2_lines + [""] + s3_lines + [""] + s4_lines
+    out_lines = [l + "\n" for l in combined]
+    return out_lines, unit_id
+
 def write_extracted_file(filepath, lines, trim_last_newline=True):
 
     """
@@ -744,6 +889,8 @@ def detect_sns_from_folder(folder_path):
     matches = re.findall(r'S[AG]F[A-Z0-9]+', folder_name)
     if not matches:
         matches = re.findall(r'FVB[A-Z0-9]{6,12}', folder_name)
+    if not matches:
+        matches = re.findall(r'PM[A-Z0-9]{10,}', folder_name)
     if not matches:
         matches = re.findall(r'[A-Z0-9]{14,}', folder_name)
     
@@ -880,9 +1027,31 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
         }
     else:
         folder_name = os.path.basename(input_dir.rstrip('\\/'))
+        is_psu = target_sn.startswith("PM") or "DYJW5" in folder_name or check_is_psu_dyjw5(test_results_dir, folder_name)
         is_rpc73 = check_is_iom_rpc73(test_results_dir)
 
-        if is_rpc73:
+        if is_psu:
+            out_lines, unit_id = extract_psu_dyjw5(test_results_dir, target_sn)
+            pcm_name = "PCM 1" if unit_id == "psu0" else "PCM 2"
+            print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ 2U PSU DYJW5]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}2U PSU (DYJW5){Color.RESET} │ Unit: {Color.YELLOW}{unit_id} ({pcm_name}){Color.RESET}")
+
+            psu_report_name = "Controller FW, Drive FW, Serial Number Tracking & Test History.txt"
+            psu_out_path = os.path.join(out_dir, psu_report_name)
+            write_extracted_file(psu_out_path, out_lines, trim_last_newline=True)
+            saved_paths.append(psu_out_path)
+            print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {psu_report_name} ({len(out_lines)} dòng) tại:{Color.RESET}")
+            print(f"  {Color.BOLD}{Color.WHITE}➜ {psu_out_path}{Color.RESET}")
+
+            return {
+                "sn": target_sn,
+                "unit_type": "PSU DYJW5",
+                "controller": unit_id,
+                "status": "SUCCESS",
+                "error": None,
+                "out_dir": out_dir,
+                "paths": saved_paths
+            }
+        elif is_rpc73:
             vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
             vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
             detected_ctrl = detect_rpc73_controller_from_vpd(clean_log_lines(vpd_log_path), target_sn)
@@ -968,6 +1137,7 @@ def generate_sample_csv(output_csv_path="mau_danh_sach_log.csv"):
 
     sample_content = [
         ["LogPath", "TargetSN", "OutputBaseDir (De trong = Mac dinh thu muc me cua LogPath)"],
+        [r"D:\JA_TESTER\LOGS_ANL\2U_PSU\jbod_cto_test_uut0_DYJW5_PMV1104029G007D_PMV1104029G007K_20261003-142309", "PMV1104029G007D", ""],
         [r"D:\JA_TESTER\LOGS_ANL\4U_Juno\FVBTL0000E_RAW\juno_fin2_test_uut0_J024X1-995_FVBTL0000E_20260912-154742", "FVBTL0000E", ""],
         [r"D:\JA_TESTER\LOGS_ANL\2U24\jbod_cto_test_uut0_NP0W0_SGFVN2632836201_20260808-164852", "SGFVN2632836201", ""],
         [r"D:\JA_TESTER\LOGS_ANL\IO\rbod_fin2_test_uut0_TD214_SAFVN2628836122_SAFVN262883610F_20260717-053125", "SAFVN262883610F", ""]
@@ -1141,7 +1311,7 @@ def run_batch_extraction(batch_items):
             print(f"  {Color.RED}✖ Lỗi khi trích xuất SN {target_sn}: {e}{Color.RESET}")
             results.append({
                 "sn": target_sn,
-                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis" if target_sn.startswith("SGF") else "IO"),
+                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis" if target_sn.startswith("SGF") else ("PSU DYJW5" if target_sn.startswith("PM") else "IO")),
                 "controller": "-",
                 "status": "FAIL",
                 "error": str(e),
@@ -1271,13 +1441,18 @@ def main():
         if detected_sns:
             if len(detected_sns) == 1 or detected_sns[0].startswith("SGF"):
                 sn_item = detected_sns[0]
-                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis" if sn_item.startswith("SGF") else "IO")
+                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis" if sn_item.startswith("SGF") else ("PSU" if sn_item.startswith("PM") else "IO"))
                 print(f"\n{Color.BRIGHT_YELLOW}⚡ [TỰ ĐỘNG CHỌN SN {unit_tag.upper()}]:{Color.RESET} {Color.BOLD}{Color.WHITE}{sn_item}{Color.RESET}")
                 target_sn_raw = sn_item
             else:
                 print(f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Phát hiện Serial Number trong tên thư mục. Vui lòng chọn:{Color.RESET}")
                 for idx, sn in enumerate(detected_sns, 1):
-                    ctrl_tag = f" ({'ctrla' if idx == 1 else 'ctrlb'})" if not sn.startswith("SGF") else ""
+                    if sn.startswith("PM"):
+                        ctrl_tag = f" ({'psu0 / PCM 1' if idx == 1 else 'psu1 / PCM 2'})"
+                    elif not sn.startswith("SGF") and not sn.startswith("FVB"):
+                        ctrl_tag = f" ({'ctrla' if idx == 1 else 'ctrlb'})"
+                    else:
+                        ctrl_tag = ""
                     print(f"   {Color.CYAN}[{idx}]{Color.RESET} {Color.BOLD}{Color.WHITE}{sn}{Color.RESET}{Color.GRAY}{ctrl_tag}{Color.RESET}")
 
                 default_choice = 1

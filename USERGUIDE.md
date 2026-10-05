@@ -36,6 +36,7 @@ Vui lòng chọn chế độ làm việc:
 ### Chế độ [1]: Trích xuất 1 thư mục log đơn lẻ (Single Folder Mode)
 - **Bước 1**: Dán hoặc nhập đường dẫn thư mục log raw vào ô nhập. Hỗ trợ kéo thả thư mục vào cửa sổ console.
 - **Bước 2**: Công cụ tự động phân tích tên thư mục:
+  - Nếu là **2U PSU DYJW5 (`PMV...`)**: Hiển thị danh sách các SN tìm thấy kèm vị trí PSU (`[1] PMV... (psu0 / PCM 1)`, `[2] PMV... (psu1 / PCM 2)`).
   - Nếu là **IO (`SAF...`)** hoặc **IOM RPC73**: Hiển thị danh sách các SN tìm thấy kèm vai trò controller (`[1] SAFVN... (ctrla)`, `[2] SAFVN... (ctrlb)`). Chỉ cần nhấn số `1`, `2` hoặc bấm `Enter` để chọn số `1`.
   - Nếu là **Chassis 2U (`SGF...`)** hoặc **Chassis 4U (`FVB...`)**: Tự động nhận diện SN duy nhất, nhấn `Enter` để tiếp tục.
 - **Bước 3**: Nhập thư mục xuất báo cáo (hoặc nhấn `Enter` để sử dụng mặc định là thư mục mang tên `<Target_SN>` trong thư mục mẹ của log).
@@ -83,6 +84,13 @@ Vui lòng chọn chế độ làm việc:
 - `VPD.txt`: Bảng kiểm định VPD bắt đầu từ tiêu đề `name | Oper | CTP status` đến dòng kết thúc `Skipping VPD Check...`, giữ nguyên tiền tố số dòng `|XXXX|`.
 - `Restore Default.txt`: Quá trình reset mặc định từ `Verify Factory reset flag state` đến `Factory reset successful`, giữ tiền tố `|XXXX|`.
 - `Provisioning State.txt`: Trạng thái provisioning của hệ thống.
+
+### E. Đối với 2U PSU DYJW5 (`PMV...` / `DYJW5`):
+- Tự động nhận diện và tạo duy nhất 1 tệp tin báo cáo tổng hợp: **`Controller FW, Drive FW, Serial Number Tracking & Test History.txt`** (116 dòng) gồm 4 phần:
+  1. *PCM Firmware & VPD CRC*: 6 dòng thông tin firmware, cấu trúc VPD và mã CRC của cả 2 bộ nguồn PCM 1 và PCM 2 từ Step 06 (`write_vpd`).
+  2. *VPD Raw Hex Dump*: 7 dòng hex dump từ bảng đối soát sau nạp VPD (VPD 40 cho `psu0` hoặc VPD 41 cho `psu1`), dải offset `0000:` đến `0050:` từ Step 06.
+  3. *Customer VPD Hex Dump*: 16 dòng hex dump của VPD 60 (cho `psu0`) hoặc VPD 61 (cho `psu1`) từ Step 07 (`vpd_validation`) gồm offset `0000:` đến `0090:`, dòng phân cách trống và dải `0360:` đến `0390:`.
+  4. *Customer VPD Validation Table*: 84 dòng bảng kiểm thử customer VPD từ Step 07 kết thúc tại `result: match` của khối `fru_description`.
 
 ---
 
