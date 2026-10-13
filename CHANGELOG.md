@@ -7,6 +7,30 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.4.0] - 2026-10-13
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Bổ sung hỗ trợ dòng Chassis Dell 5U84 (Part Number W47DG)**:
+  - Tự động nhận diện cấu hình kiểm thử Dell 5U Chassis qua tên thư mục hoặc log chứa `W47DG`, `5U_Dell`, `5U84ENC`, `5U84NPCM`, `ASSY,CHAS,RKMNT,5U`.
+  - Phân định thông minh giữa Chassis 2U tiêu chuẩn (`SGF...` xuất ra `<SN>.txt`) và Chassis 5U Dell (`SGF...` xuất ra bộ đôi `FW.txt` và `VPD.txt`).
+  - Trích xuất chuẩn xác 100% byte-for-byte theo mẫu xuất xưởng của Dell 5U:
+    1. **FW.txt** (21 dòng):
+       - Khối 1: Thông tin Midplane VPD structure (`0x13`), CRC (`0xAA7722D1`), CPLD (`0x20`) trích xuất từ Step 02 (`check_and_load_fw_test` với expander firmware `6.0.0.54`).
+       - Khối 2: 8 dòng firmware Sled 1 & Sled 2 Element 0..3 (`6.0.0.54`).
+       - Khối 3: 8 dòng SAS addresses expander sắp xếp chuẩn từ `exp:0` đến `exp:7` từ Step 07 (`vpd_validation`).
+    2. **VPD.txt** (216 dòng):
+       - Section 1: VPD 16 (1) Midplane A hex dump (`0000:` đến `00c0:`) từ Step 07 với độ rộng chuẩn 71 ký tự.
+       - Section 2: Reading customer VPD ID = 18 hex dump (`0000:` đến `00b0:`) từ Step 07.
+       - Sections 3-10: 8 khối bảng hex diff Canister VPD 48 của các expander `exp:0` đến `exp:7` từ Step 06 (`write_vpd`), được chuẩn hóa header và địa chỉ hex (`0000:` đến `0070:` cho exp:0, `0000:` đến `0050:` cho exp:1..7).
+       - Sections 11-17: 7 khối kết quả lệnh và so sánh `set_midplanevpd 2` đến `set_midplanevpd 8` từ Step 07.
+       - Section 18: Bảng Customer VPD validation table đầy đủ từ `name: part_number` đến dòng `result: match` của `fru_description` (`ASSY,CHAS,RKMNT,5U84NPCM`).
+- **Nâng cấp Cơ chế Nhận diện & Trích xuất Hàng loạt**:
+  - Tích hợp nhận diện `Chassis 5U` vào bảng thống kê tổng hợp batch kết quả.
+  - Cập nhật kịch bản mẫu CSV (`mau_danh_sach_log.csv`) bổ sung cấu hình dòng 5U Dell (`W47DG`).
+  - Đảm bảo tính tương thích hồi quy 100% đối với toàn bộ các dòng sản phẩm hiện hữu (IO Controller chuẩn, IOM RPC73, Chassis 2U, Chassis 4U Juno, PSU 2U DYJW5, PSU 5U 0R4C4).
+
+---
+
 ## [v1.3.1] - 2026-10-06
 
 ### 🚀 Nâng cấp & Tính năng mới

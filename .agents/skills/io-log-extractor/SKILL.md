@@ -22,6 +22,10 @@ This skill provides step-by-step instructions and automated tool support to extr
 - **PSU Units (`PMV...` / `DYJW5` / `0R4C4`)**: Dell ME4 Power Supply Units (2U DYJW5 & 5U 0R4C4).
   - Generates 1 combined report file: `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 lines).
   - PSU role (`psu0` / `psu1`) is mapped to PCM 1 vs PCM 2, VPD 40/41 hex dump in Step 06 (`write_vpd`), and VPD 60/61 customer validation in Step 07 (`vpd_validation`).
+- **Chassis 5U Dell Unit (`SGF...` / `W47DG` / `5U84`)**: Dell 5U84 Chassis (PN W47DG).
+  - Generates 2 report files: `FW.txt` (21 lines) and `VPD.txt` (216 lines).
+  - Midplane structure (0x13), CRC, CPLD, 8 Element FW lines from Step 02, and 8 expander SAS addresses from Step 07.
+  - VPD 16 Midplane A, VPD 18 Customer A, 8 Canister VPD 48 hex diff blocks (exp:0..7) from Step 06, 7 set_midplanevpd verifications, and Customer VPD validation table from Step 07.
 - **Chassis 2U Unit (`SGF...`)**: Serial numbers starting with `SGF` (e.g., `SGFVN26318361A6`).
   - Generates 1 report file: `<target_sn>.txt`.
 - **Chassis 4U Unit (`FVB...`)**: Serial numbers starting with `FVB` (e.g., `FVBTL0000E`).

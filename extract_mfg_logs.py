@@ -9,7 +9,7 @@ import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0"
 APP_BUILD = "1"
 
 # Enable ANSI escape sequences on Windows console
@@ -524,6 +524,238 @@ def extract_chassis_4u_logs(input_dir, target_sn, output_base):
         )
     return output_dir, saved_paths
 
+def check_is_chassis_5u_dell(test_results_dir, folder_name=""):
+    """
+    Check if an input log directory corresponds to Dell 5U Chassis (PN W47DG / 5U84).
+    """
+    if "W47DG" in folder_name or "5U_Dell" in folder_name or "5U84" in folder_name:
+        return True
+    if test_results_dir:
+        try:
+            vpd_step_dir = find_step_dir(test_results_dir, "vpd_validation")
+            vpd_log_path = os.path.join(vpd_step_dir, "debug.log")
+            if os.path.exists(to_long_path(vpd_log_path)):
+                with open(to_long_path(vpd_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(50000)
+                if "W47DG" in content or "5U84ENC" in content or "5U84NPCM" in content or "ASSY,CHAS,RKMNT,5U" in content:
+                    return True
+        except Exception:
+            pass
+    return False
+
+def find_chassis_5u_fw_step_dir(test_results_dir):
+    """
+    Locate the check_and_load_fw_test step containing 'Midplane VPD structure' and 'Sled 1 Element 0 Firmware' (typically Step 02).
+    """
+    long_tr = to_long_path(test_results_dir)
+    fw_dirs = [d for d in os.listdir(long_tr) if os.path.isdir(to_long_path(os.path.join(test_results_dir, d))) and 'check_and_load_fw_test' in d]
+    fw_dirs.sort(key=lambda item: int(re.match(r'^(\d+)-', item).group(1)) if re.match(r'^(\d+)-', item) else 0)
+    for d in fw_dirs:
+        full_p = os.path.join(test_results_dir, d)
+        log_p = os.path.join(full_p, "debug.log")
+        if os.path.exists(to_long_path(log_p)):
+            with open(to_long_path(log_p), 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            if "Midplane VPD structure" in content and "Sled 1 Element 0 Firmware" in content:
+                return full_p
+    return find_step_dir(test_results_dir, "check_and_load_fw_test")
+
+def extract_chassis_5u_dell_logs(input_dir, target_sn, output_base):
+    """
+    Extract Chassis 5U Dell (PN W47DG) report files:
+    1. FW.txt:
+       - Midplane VPD structure, CRC, CPLD (from Step 02, fallback Step 07)
+       - Sled 1/2 Element 0-3 Firmware (8 lines)
+       - Expander SAS addresses sorted exp:0 to exp:7 (8 lines from Step 07)
+    2. VPD.txt:
+       - Section 1 (Step 07): VPD 16 Midplane A hex dump (0000: to 00c0:)
+       - Section 2 (Step 07): VPD 18 Midplane Customer A hex dump (0000: to 00b0:)
+       - Sections 3-10 (Step 06): exp:0..7 VPD 48 Canister hex dumps (sorted exp:0..7)
+       - Sections 11-17 (Step 07): Midplane VPD verification for set_midplanevpd 2..8
+       - Section 18 (Step 07): Customer VPD validation table (part_number down to fru_description match)
+    """
+    abs_input = os.path.abspath(input_dir.strip(' "\' \t\r\n'))
+    test_results_dir = find_test_results_dir(abs_input)
+    unit_root = get_log_unit_root(abs_input)
+    parent_dir = os.path.dirname(unit_root)
+
+    if not output_base:
+        output_base = parent_dir
+    
+    clean_base = output_base.strip(' "\' \t\r\n')
+    abs_base = os.path.abspath(clean_base)
+
+    if os.path.basename(abs_base.rstrip('\\/')) == target_sn:
+        output_dir = abs_base
+    else:
+        output_dir = os.path.join(abs_base, target_sn)
+    
+    os.makedirs(to_long_path(output_dir), exist_ok=True)
+    saved_paths = []
+
+    # Find step directories
+    fw_step_dir = find_chassis_5u_fw_step_dir(test_results_dir)
+    fw_log_path = os.path.join(fw_step_dir, "debug.log")
+
+    s06_dir = find_step_dir(test_results_dir, "write_vpd")
+    s06_log_path = os.path.join(s06_dir, "debug.log")
+
+    s07_dir = find_step_dir(test_results_dir, "vpd_validation")
+    s07_log_path = os.path.join(s07_dir, "debug.log")
+
+    with open(to_long_path(fw_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+        fw_lines = [l.rstrip('\r\n') for l in f]
+
+    with open(to_long_path(s06_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+        s06_lines = [l.rstrip('\r\n') for l in f]
+
+    with open(to_long_path(s07_log_path), 'r', encoding='utf-8', errors='ignore') as f:
+        s07_lines = [l.rstrip('\r\n') for l in f]
+
+    # 1. Generate FW.txt
+    candidates = []
+    for i in range(len(fw_lines)):
+        l = fw_lines[i]
+        if '|0250|Midplane VPD structure' in l and i + 35 < len(fw_lines):
+            nearby = ''.join(fw_lines[i:i+35])
+            if 'Sled 1 Element 0 Firmware' in nearby and '6.0.0.54' in nearby:
+                c_b1 = []
+                for j in range(i, i+5):
+                    if any(k in fw_lines[j] for k in ['Midplane VPD structure', 'Midplane VPD CRC', 'Midplane CPLD']):
+                        c_b1.append(fw_lines[j][fw_lines[j].find('|0250|'):])
+                c_b2 = []
+                for j in range(i, i+35):
+                    if 'Sled ' in fw_lines[j] and 'Element ' in fw_lines[j]:
+                        c_b2.append(fw_lines[j][fw_lines[j].find('|0250|'):])
+                candidates.append((c_b1, c_b2))
+
+    fw_b1 = []
+    fw_b2 = []
+    for c_b1, c_b2 in candidates:
+        if any('0x13' in l for l in c_b1):
+            fw_b1 = c_b1
+            fw_b2 = c_b2
+            break
+    if not fw_b1 and candidates:
+        fw_b1, fw_b2 = candidates[0]
+
+    # Fallback to Step 07 if Step 02 did not have candidate
+    if not fw_b1:
+        for i in range(len(s07_lines)):
+            l = s07_lines[i]
+            if '|0250|Midplane VPD structure' in l and i + 35 < len(s07_lines):
+                for j in range(i, i+5):
+                    if any(k in s07_lines[j] for k in ['Midplane VPD structure', 'Midplane VPD CRC', 'Midplane CPLD']):
+                        fw_b1.append(s07_lines[j][s07_lines[j].find('|0250|'):])
+                for j in range(i, i+35):
+                    if 'Sled ' in s07_lines[j] and 'Element ' in s07_lines[j]:
+                        fw_b2.append(s07_lines[j][s07_lines[j].find('|0250|'):])
+                break
+
+    # Expander SAS addresses from Step 07
+    exp_sas_dict = {}
+    for l in s07_lines:
+        m = re.search(r'(\|3673\|)(exp:\d+:\s+vpd_type 2:\s+\[[0-9a-fA-F]+\])', l)
+        if m:
+            exp_id = re.search(r'exp:(\d+)', m.group(2)).group(1)
+            exp_sas_dict[int(exp_id)] = m.group(1) + m.group(2)
+    fw_b3 = [exp_sas_dict[k] for k in sorted(exp_sas_dict.keys())]
+
+    fw_all_lines = fw_b1 + [""] + fw_b2 + [""] + fw_b3
+    fw_out_path = os.path.join(output_dir, "FW.txt")
+    write_extracted_file(fw_out_path, [l + "\n" for l in fw_all_lines], trim_last_newline=True)
+    saved_paths.append(fw_out_path)
+
+    # 2. Generate VPD.txt
+    vpd_b1 = []
+    in_b1 = False
+    for l in s07_lines:
+        if 'VPD 16 (1) - Midplane A' in l and ('+' in l or '|' in l):
+            vpd_b1.append(l[:72].rstrip())
+            in_b1 = True
+            continue
+        if in_b1:
+            if re.search(r'^[0-9a-fA-F]{4}:', l.strip()):
+                vpd_b1.append(l[:72].rstrip())
+                if l.strip().startswith('00c0:'):
+                    break
+
+    vpd_b2 = []
+    in_b2 = False
+    for l in s07_lines:
+        if 'Reading customer VPD (ID = 18)' in l:
+            idx = l.find('|3891|')
+            vpd_b2.append(l[idx:].rstrip())
+            in_b2 = True
+            continue
+        if in_b2:
+            m = re.search(r'\|(\d{4})\|(.*)$', l)
+            if m:
+                clean_l = f'|{m.group(1)}|{m.group(2)}'.rstrip()
+                vpd_b2.append(clean_l)
+                if '|0509|00b0:' in clean_l:
+                    break
+
+    exp_vpd_dict = {}
+    for i, l in enumerate(s06_lines):
+        if 'VPD 48 (1) - Canister' in l and '|' in l and l.startswith('exp:'):
+            exp_id = int(l.split(':')[1])
+            hdr = l[:65]
+            n_lines = 8 if exp_id == 0 else 6
+            hex_lines = []
+            for j in range(i + 1, i + 1 + n_lines):
+                hex_lines.append(s06_lines[j][6:71])
+            exp_vpd_dict[exp_id] = [hdr] + hex_lines
+    exp_vpd_list = [exp_vpd_dict[k] for k in sorted(exp_vpd_dict.keys())]
+
+    midplane_blocks = []
+    for vpd_type in range(2, 9):
+        match_marker = f'|3673|TWI bus 2 vpd_type {vpd_type}:'
+        match_idx = None
+        for i, l in enumerate(s07_lines):
+            if match_marker in l and '-> match' in l:
+                match_idx = i
+                break
+
+        out_cmd_marker = f'|0509|Output of cmd "set_midplanevpd {vpd_type}" is'
+        cmd_idx = None
+        for j in range(match_idx - 1, max(0, match_idx - 20), -1):
+            if out_cmd_marker in s07_lines[j]:
+                cmd_idx = j
+                break
+
+        blk_lines = []
+        hdr_l = s07_lines[cmd_idx]
+        blk_lines.append(hdr_l[hdr_l.find('|0509|'):])
+        blk_lines.append(s07_lines[cmd_idx + 1])
+        blk_lines.append(s07_lines[cmd_idx + 2])
+        l4 = s07_lines[match_idx]
+        l5 = s07_lines[match_idx + 1]
+        blk_lines.append(l4[l4.find('|3673|'):])
+        blk_lines.append(l5[l5.find('|3673|'):])
+        midplane_blocks.append(blk_lines)
+
+    vpd_b18 = []
+    in_b18 = False
+    for i, l in enumerate(s07_lines):
+        if '|3903|name: part_number, size: 32' in l:
+            in_b18 = True
+        if in_b18:
+            m = re.search(r'\|(\d{4})\|(.*)$', l)
+            if m:
+                vpd_b18.append(f'|{m.group(1)}|{m.group(2)}')
+                if m.group(1) == '3993' and 'fru_description' in '\n'.join(vpd_b18[-10:]):
+                    break
+
+    all_vpd_sections = [vpd_b1, vpd_b2] + exp_vpd_list + midplane_blocks + [vpd_b18]
+    vpd_full_text = '\n\n'.join('\n'.join(sec) for sec in all_vpd_sections)
+    vpd_lines_out = [l + '\n' for l in vpd_full_text.splitlines()]
+    vpd_out_path = os.path.join(output_dir, "VPD.txt")
+    write_extracted_file(vpd_out_path, vpd_lines_out, trim_last_newline=True)
+    saved_paths.append(vpd_out_path)
+
+    return output_dir, saved_paths
+
 def check_is_iom_rpc73(test_results_dir):
     """
     Check if an IO log directory is for IOM RPC73:
@@ -999,16 +1231,21 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
     """
     input_dir = os.path.abspath(input_dir_raw.strip(' "\' \t\r\n'))
     target_sn = target_sn_raw.strip(' "\' \t\r\n')
-    is_chassis_4u = target_sn.startswith("FVB")
-    is_chassis_2u = target_sn.startswith("SGF")
-    is_chassis = is_chassis_2u or is_chassis_4u
-
     unit_root = get_log_unit_root(input_dir)
     parent_dir = os.path.dirname(unit_root)
+    folder_name = os.path.basename(input_dir.rstrip('\\/'))
 
     # Smart default output base dir if not provided: default to parent of input folder
     if not output_base_raw:
         output_base_raw = parent_dir
+
+    # Find test-results directory inside input_dir (handles job-*, latest, or direct test-results)
+    test_results_dir = find_test_results_dir(input_dir)
+
+    is_chassis_4u = target_sn.startswith("FVB")
+    is_chassis_5u_dell = (target_sn.startswith("SGF") or "W47DG" in folder_name or "5U_Dell" in folder_name or "5U84" in folder_name) and check_is_chassis_5u_dell(test_results_dir, folder_name)
+    is_chassis_2u = target_sn.startswith("SGF") and not is_chassis_5u_dell
+    is_chassis = is_chassis_2u or is_chassis_4u or is_chassis_5u_dell
 
     if is_chassis_4u:
         print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ CHASSIS 4U]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}Chassis 4U (Juno){Color.RESET}")
@@ -1026,11 +1263,23 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw):
             "paths": saved_paths
         }
 
+    if is_chassis_5u_dell:
+        print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ CHASSIS 5U DELL]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng sản phẩm: {Color.MAGENTA}Chassis 5U Dell (W47DG){Color.RESET}")
+        out_dir, saved_paths = extract_chassis_5u_dell_logs(input_dir, target_sn, output_base_raw)
+        print(f"{Color.BRIGHT_GREEN}✔ Đã tạo {len(saved_paths)} file báo cáo Chassis 5U Dell tại:{Color.RESET}")
+        print(f"  {Color.BOLD}{Color.WHITE}➜ {out_dir}{Color.RESET}")
+
+        return {
+            "sn": target_sn,
+            "unit_type": "Chassis 5U",
+            "controller": "-",
+            "status": "SUCCESS",
+            "error": None,
+            "out_dir": out_dir,
+            "paths": saved_paths
+        }
+
     out_dir, chassis_file_path = resolve_output_paths(output_base_raw, target_sn, is_chassis, unit_root=unit_root)
-
-    # Find test-results directory inside input_dir (handles job-*, latest, or direct test-results)
-    test_results_dir = find_test_results_dir(input_dir)
-
     saved_paths = []
 
     if is_chassis_2u:
@@ -1169,6 +1418,7 @@ def generate_sample_csv(output_csv_path="mau_danh_sach_log.csv"):
 
     sample_content = [
         ["LogPath", "TargetSN", "OutputBaseDir (De trong = Mac dinh thu muc me cua LogPath)"],
+        [r"D:\JA_TESTER\LOGS_ANL\5U_Dell\jbod_cto_test_uut0_W47DG_SGFVN26418364D7_20261008-124933", "SGFVN26418364D7", ""],
         [r"D:\JA_TESTER\LOGS_ANL\5U_PSU\jbod_cto_test_uut0_0R4C4_PMV1104546G0016_PMV1104546G0017_20261005-134529", "PMV1104546G0016", ""],
         [r"D:\JA_TESTER\LOGS_ANL\2U_PSU\jbod_cto_test_uut0_DYJW5_PMV1104029G007D_PMV1104029G007K_20261003-142309", "PMV1104029G007D", ""],
         [r"D:\JA_TESTER\LOGS_ANL\4U_Juno\FVBTL0000E_RAW\juno_fin2_test_uut0_J024X1-995_FVBTL0000E_20260912-154742", "FVBTL0000E", ""],
@@ -1353,7 +1603,7 @@ def run_batch_extraction(batch_items):
             print(f"  {Color.RED}✖ Lỗi khi trích xuất SN {target_sn}: {e}{Color.RESET}")
             results.append({
                 "sn": target_sn,
-                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else "IO")),
+                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis 5U" if ("W47DG" in log_path or "5U_Dell" in log_path or "5U84" in log_path) else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else "IO"))),
                 "controller": "-",
                 "status": "FAIL",
                 "error": str(e),
@@ -1513,7 +1763,7 @@ def main():
         if detected_sns:
             if len(detected_sns) == 1 or detected_sns[0].startswith("SGF"):
                 sn_item = detected_sns[0]
-                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis" if sn_item.startswith("SGF") else ("PSU" if sn_item.startswith("PM") else "IO"))
+                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis 5U" if ("W47DG" in input_dir or "5U_Dell" in input_dir or "5U84" in input_dir) else ("Chassis" if sn_item.startswith("SGF") else ("PSU" if sn_item.startswith("PM") else "IO")))
                 print(f"\n{Color.BRIGHT_YELLOW}⚡ [TỰ ĐỘNG CHỌN SN {unit_tag.upper()}]:{Color.RESET} {Color.BOLD}{Color.WHITE}{sn_item}{Color.RESET}")
                 target_sn_raw = sn_item
             else:

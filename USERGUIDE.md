@@ -1,4 +1,4 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.3.1
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.4.0
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE) và nhân viên vận hành trạm test.
 
@@ -22,7 +22,7 @@ Khi khởi động, màn hình menu chính hiển thị 4 lựa chọn:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.3.1  │
+│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.4.0  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:
@@ -75,10 +75,23 @@ Vui lòng chọn chế độ làm việc:
   3. *VPD 49 Hex Dump*: 15 dòng hex dump của Canister Customer VPD từ Step 07 (`vpd_validation`) gồm header, offset `0000:` đến `00a0:`, và 2 dòng `0360:` / `0370:`, khớp với Serial Number của Canister.
   4. *Customer VPD Validation*: 83 dòng bảng kiểm thử customer VPD từ Step 07 kết thúc tại `result: match` của khối `fru_description`.
 
-### C. Đối với Chassis 2U (`SGF...`):
+### C. Đối với Chassis 5U Dell (`SGF...` / `W47DG` / `5U84`):
+- Tự động nhận diện và trích xuất bộ đôi tệp tin báo cáo tiêu chuẩn:
+  1. **`FW.txt`** (21 dòng):
+     - Khối 1: Cấu trúc Midplane VPD (`0x13`), CRC (`0xAA7722D1`), CPLD (`0x20`) trích xuất từ Step 02 (`check_and_load_fw_test`).
+     - Khối 2: 8 dòng firmware Sled 1 & Sled 2 Element 0..3 (`6.0.0.54`).
+     - Khối 3: 8 dòng địa chỉ SAS expander (`exp:0` đến `exp:7`) từ Step 07 (`vpd_validation`).
+  2. **`VPD.txt`** (216 dòng):
+     - Section 1: VPD 16 (1) Midplane A hex dump (`0000:` đến `00c0:`) từ Step 07.
+     - Section 2: Reading customer VPD ID = 18 hex dump (`0000:` đến `00b0:`) từ Step 07.
+     - Sections 3-10: 8 khối bảng hex diff Canister VPD 48 của các expander `exp:0` đến `exp:7` từ Step 06 (`write_vpd`).
+     - Sections 11-17: 7 khối kết quả lệnh `set_midplanevpd 2` đến `set_midplanevpd 8` từ Step 07.
+     - Section 18: Bảng Customer VPD validation table đầy đủ từ Step 07 kết thúc tại `result: match` của `fru_description`.
+
+### D. Đối với Chassis 2U (`SGF...`):
 - `<SN>.txt`: Tổng hợp 4 khối tiêu chuẩn: Cấu trúc Midplane VPD, Midplane CRC/CPLD, Mã hex Customer VPD và thông tin `fru_description`.
 
-### D. Đối với Chassis 4U Juno (`FVB...`):
+### E. Đối với Chassis 4U Juno (`FVB...`):
 - `FW.txt`: Thông tin firmware controller A và controller B đã làm sạch biến thời gian.
 - `GETVPD.txt`: Nội dung lệnh `gemcli getvpd` đã ghép nối đúng chu kỳ test.
 - `VER.txt`: Nội dung lệnh `gemcli ver` có cùng tiền tố timestamp với GETVPD.
@@ -86,7 +99,7 @@ Vui lòng chọn chế độ làm việc:
 - `Restore Default.txt`: Quá trình reset mặc định từ `Verify Factory reset flag state` đến `Factory reset successful`, giữ tiền tố `|XXXX|`.
 - `Provisioning State.txt`: Trạng thái provisioning của hệ thống.
 
-### E. Đối với 2U PSU DYJW5 (`PMV...` / `DYJW5`):
+### F. Đối với PSU 2U & 5U (`PMV...` / `DYJW5` / `0R4C4`):
 - Tự động nhận diện và tạo duy nhất 1 tệp tin báo cáo tổng hợp: **`Controller FW, Drive FW, Serial Number Tracking & Test History.txt`** (116 dòng) gồm 4 phần:
   1. *PCM Firmware & VPD CRC*: 6 dòng thông tin firmware, cấu trúc VPD và mã CRC của cả 2 bộ nguồn PCM 1 và PCM 2 từ Step 06 (`write_vpd`).
   2. *VPD Raw Hex Dump*: 7 dòng hex dump từ bảng đối soát sau nạp VPD (VPD 40 cho `psu0` hoặc VPD 41 cho `psu1`), dải offset `0000:` đến `0050:` từ Step 06.
