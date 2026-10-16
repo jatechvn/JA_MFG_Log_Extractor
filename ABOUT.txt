@@ -3,8 +3,8 @@ CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
 Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis 2U/4U/5U & PSU 2U/5U)
-Phiên bản      : 1.4.0+1
-Ngày phát hành : 2026-10-13
+Phiên bản      : 1.6.0+1
+Ngày phát hành : 2026-10-15
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
@@ -12,55 +12,51 @@ Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xu�
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
 Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG, PSU 2U DYJW5 & PSU 5U 0R4C4).
 
-TÍNH NĂNG NỔI BẬT (v1.4.0):
-1. Hỗ trợ toàn diện 7 chủng loại thiết bị:
-   - Chassis 5U Dell (`SGF...` / `W47DG` / `5U84`): Tự động nhận diện và trích xuất
-     bộ 2 file báo cáo tiêu chuẩn khớp 100% byte-for-byte với mẫu xuất xưởng:
-     + `FW.txt` (21 dòng): Midplane VPD structure (0x13), CRC (0xAA7722D1), CPLD (0x20)
-       từ Step 02, 8 dòng firmware Sled 1 & 2 Element 0..3 (6.0.0.54) và 8 địa chỉ
-       SAS expander (exp:0..7) từ Step 07.
-     + `VPD.txt` (216 dòng): VPD 16 Midplane A hex dump (0000: đến 00c0:), VPD 18 Customer A,
-       8 bảng exp:0..7 Canister VPD 48 hex diff từ Step 06 (write_vpd), 7 khối kiểm tra
-       set_midplanevpd 2..8 từ Step 07 và bảng Customer VPD validation đầy đủ (32 thuộc tính).
-   - PSU 5U 0R4C4 (`PMV...` / `0R4C4`): Trích xuất báo cáo kết hợp
-     `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
-     với I2C bus 32 addr=15h (PCM 1 / psu0) và addr=17h (PCM 2 / psu1).
-   - PSU 2U DYJW5 (`PMV...` / `DYJW5`): Trích xuất báo cáo kết hợp
-     `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng)
-     từ Step 06 (write_vpd) và Step 07 (vpd_validation), tự động phân định psu0 (PCM 1)
-     hoặc psu1 (PCM 2) với các khối VPD 40/41 hex dump và Customer VPD 60/61.
-   - IO Controller chuẩn (`SAF...`): Trích xuất FW.txt (theo đúng vị trí controller
-     ctrla/ctrlb) và VPD.txt (2 phần: gem ebodvpd + customer VPD ID 49).
-   - IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'): Tự động nhận diện và trích xuất
-     báo cáo kết hợp FW_VPD.txt gồm 4 phần: Canister firmware (Step 2), FW match
-     (Step 2), VPD 49 hex dump (Step 7) và Customer VPD validation (Step 7).
-   - Chassis 2U (`SGF...`): Trích xuất <SN>.txt gồm 4 khối chuẩn (Midplane structure,
-     Midplane VPD, Customer VPD hex dump và fru_description).
-   - Chassis 4U Juno (`FVB...`): Tự động trích xuất bộ 6 file báo cáo tiêu chuẩn:
-     FW.txt, GETVPD.txt, VER.txt, VPD.txt, Restore Default.txt, Provisioning State.txt.
-2. Cơ chế đồng bộ Timestamp & Khối số dòng:
-   - Tự động ghép cặp chính xác giữa GETVPD và VER cùng chu kỳ test (sai lệch mili-giây).
-   - Bảo toàn khối số dòng chuẩn (|XXXX|) phục vụ kiểm toán và đối soát MES.
-   - Tự động phát hiện và giải nén log lưu trữ (.tar.gz trong enc_logs).
-3. Định tuyến đường dẫn xuất báo cáo thông minh:
-   - Xuất vào thư mục mang tên "SN tương ứng" bên trong thư mục mẹ của log thô.
-   - Cơ chế chống lồng trùng lặp tên thư mục SN (Anti-nesting guard).
-   - Hỗ trợ Windows Extended-Length Path (\\?\) vượt giới hạn 260 ký tự MAX_PATH.
-4. Giao diện CLI Đa Chế Độ & Khả năng Thực thi Từ xa (WinRM / SSH):
-   - Chế độ 1 thư mục đơn lẻ (Single Folder Mode) với nhận diện tự động SN.
-   - Chế độ quét hàng loạt thư mục con (Batch Subfolders Scan).
-   - Chế độ nhập danh sách hàng loạt từ file CSV / TXT.
-   - Tạo file CSV mẫu (mau_danh_sach_log.csv).
-   - Trình khởi chạy Chay_Tool_Log.bat tự động thích ứng môi trường console, WinRM,
-     SSH, non-interactive CI, chạy trực tiếp tại console mà không tạo process tách biệt.
-   - An toàn tuyệt đối với stdin redirected/pipes, ngăn ngừa lỗi EOFError.
-5. Tách biệt không gian lưu trữ:
-   - Toàn bộ mã nguồn, tài liệu, kịch bản build độc lập trong workspace dự án.
-   - Thư mục dữ liệu sản xuất (D:\JA_TESTER\LOGS_ANL) được giải phóng, chỉ chứa log và báo cáo.
+TÍNH NỔI BẬT (v1.6.0):
+1. Chạy Trực tiếp trên Máy Trạm & Trích xuất Từ xa qua Liên kết Gián tiếp (Indirect Bridge):
+   - Kết nối trực tiếp hoặc xuyên mạng tự động từ máy kỹ sư (`172.21.*.*`) qua trạm cầu nối
+     Jump-Host (`172.21.168.241` / `172.19.208.133`) tới toàn bộ trạm kiểm thử (`172.19.*.*`)
+     bằng SSH `direct-tcpip` và cơ chế dự phòng tự động WinRM TCP Proxy.
+   - Hỗ trợ nhập nhanh IP rút gọn 2 octet (`116.174` hoặc `116174` -> `172.19.116.174`),
+     tìm kiếm theo 1 hoặc nhiều Serial Number (`SN1, SN2`), và lọc số bản chạy mới nhất (`--latest`).
+   - Cơ chế **Selective Fast Fetch**: Chỉ nén và tải các file văn bản nhẹ cần cho phân tích
+     (`debug.log`, `results.json`, `*.log`, `ctp_log_metadata.yaml`, `job.log`, `enc_logs/*`),
+     bỏ qua các thư mục nặng (`serial_logs/`, `sysinfo/`, `.journal.sqlite`, `results.html`),
+     giúp trích xuất báo cáo từ xa hoàn tất trong 1–3 giây mà không làm đầy ổ cứng.
+   - Hỗ trợ cờ `--keep-raw-zip` để lưu thêm bản `.zip` đầy đủ vào `<App_Dir>/downloads/<IP>/` khi cần.
+2. Lưu Báo cáo Tập trung trong Thư mục Ứng dụng (`<App_Dir>/reports/`):
+   - Toàn bộ báo cáo trích xuất của mọi chế độ (Remote IP+SN, Local Folder/Archive, Batch Scan,
+     CSV Import, Cycle Time) mặc định lưu tập trung tại `<App_Dir>/reports/<Target_SN>/` và
+     `<App_Dir>/reports/Cycle_Time_Summary.csv`.
+3. Hỗ trợ toàn diện 7 chủng loại thiết bị (100% Byte-for-Byte Verified):
+   - Chassis 5U Dell (`SGF...` / `W47DG` / `5U84`): Trích xuất bộ đôi `FW.txt` (21 dòng)
+     và `VPD.txt` (216 dòng).
+   - PSU 5U 0R4C4 (`PMV...` / `0R4C4`) & PSU 2U DYJW5 (`PMV...` / `DYJW5`): Trích xuất
+     báo cáo kết hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt`
+     (116 dòng) tự động phân định `psu0` (PCM 1) và `psu1` (PCM 2).
+   - IO Controller chuẩn (`SAF...`): Trích xuất `FW.txt` và `VPD.txt` theo `ctrla`/`ctrlb`.
+   - IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'): Trích xuất `FW_VPD.txt` (139 dòng).
+   - Chassis 2U (`SGF...`): Trích xuất `<SN>.txt` gồm 4 khối chuẩn.
+   - Chassis 4U Juno (`FVB...`): Trích xuất bộ 6 file tiêu chuẩn (`FW.txt`, `GETVPD.txt`,
+     `VER.txt`, `VPD.txt`, `Restore Default.txt`, `Provisioning State.txt`).
+4. Phân tích Cycle Time, Đọc Trực tiếp File Nén & Tự động Chẩn đoán Lỗi (`ERROR_SUMMARY.txt`):
+   - Tự động bóc tách `Test duration` (Wall-clock Cycle Time), thời gian thực thi
+     Avocado (`results.json`), `Start_Time`, `End_Time`, `Station_ID`, `Employee_ID`,
+     `Part_Number`, `Script_Name`, và số bước `Pass/Fail/Error/Skip`.
+   - Đọc trực tiếp file nén `.zip`, `.tar.gz`, `.tgz`, `.tar.xz` với Selective Stream Extraction.
+   - Khi phát hiện bước test `FAIL`/`ERROR` (bao gồm cả lỗi dừng giữa chừng `VPD rendering failed`),
+     tự động trích xuất báo cáo phần đã chạy kèm `ERROR_SUMMARY.txt`.
+5. Giao diện Tiện ích Windows, Đối soát Mẫu Chuẩn & Xử lý Đa luồng (Multi-threading):
+   - Tích hợp phím tắt `[B]` / `[F]` mở hộp thoại chọn thư mục / file nén Windows gốc,
+     `[O]` mở ngay thư mục báo cáo trong Explorer, `[R]` quay lại Menu chính.
+   - Chế độ `--verify-sample` / Menu `[7]`: Đối chiếu 100% Byte-for-Byte (SHA256, số dòng,
+     unified diff) với thư mục Golden Sample.
+   - Xử lý hàng loạt đa luồng (`--workers`, mặc định 4 luồng).
 
 CÔNG NGHỆ SỬ DỤNG:
-- Ngôn ngữ: Python 3.10+ (Standard Library, Zero-dependency).
-- Giao diện CLI: ANSI Escape Sequences, Windows Console Virtual Terminal Processing.
-- Xử lý nén & bóc tách: tarfile, glob, re, os, csv, ast.
+- Ngôn ngữ: Python 3.10+ (Tích hợp sẵn `paramiko` trong `python_runtime` Portable).
+- Giao diện CLI: ANSI Escape Sequences, Windows Console Virtual Terminal Processing, WinForms Dialogs.
+- Kết nối từ xa: Paramiko SSH / SFTP, Indirect Jump-Host Bridge (`direct-tcpip` & WinRM TCP Proxy).
+- Xử lý nén & đa luồng: zipfile, tarfile, lzma, bz2, threading, queue, hashlib, difflib, json, csv.
 - Đóng gói: Portable ZIP Package & Ready-to-run Windows Portable Bundle.
 ================================================================================

@@ -1,0 +1,25 @@
+{
+  "network": {
+    "ip_prefix": "172.19",
+    "target_network": "172.19.0.0/16",
+    "client_network": "172.21.0.0/16"
+  },
+  "bridge": {
+    "host": "172.21.168.241",
+    "username": "V1801179",
+    "password": "",
+    "connection": "auto",
+    "transport": "auto",
+    "ssh_port": 22,
+    "winrm_https": false
+  },
+  "ssh": {
+    "username": "root",
+    "password": "",
+    "port": 22
+  },
+  "windows_ssh": {
+    "username": "V1801179",
+    "password": ""
+  }
+}

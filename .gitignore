@@ -20,6 +20,12 @@ verify_*/
 temp_chassis_test.txt
 *.log
 
+# Local Credentials & Centralized Analysis Reports
+config.json
+reports/
+downloads/
+logs/
+
 # Python Runtime & Bytecode
 __pycache__/
 *.py[cod]
@@ -31,8 +37,7 @@ venv/
 env/
 ENV/
 
-# Python Portable Local Working Folder
-MFG_Log_Extractor_PythonPortable/
+# Python Portable Runtime
 python_runtime/
 
 # Release and Distribution Artifacts
