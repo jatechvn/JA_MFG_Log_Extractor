@@ -7,6 +7,51 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.6.0] - 2026-10-15
+
+### 🚀 Nâng cấp & Tính năng mới
+- **Chạy Trực tiếp & Trích xuất Từ xa qua Liên kết Gián tiếp (`Indirect Bridge` — Menu `[1]` / `--ip` & `--sn`)**:
+  - Tích hợp trọn vẹn phân hệ kết nối từ xa và cầu nối gián tiếp (`module/bridge.py`, `module/remote_fetcher.py`, `module/winrm_socket.py`, `module/winrm_bridge.ps1`, `module/config.py`, `module/ip_utils.py`) từ hệ sinh thái `seagate_log_downloader`.
+  - Cho phép chạy trực tiếp trên máy kỹ sư dải mạng văn phòng (`172.21.*.*`), tự động định tuyến trực tiếp hoặc qua trạm cầu nối Jump-Host (`172.21.168.241` / `172.19.208.133`) tới toàn bộ trạm kiểm thử (`172.19.*.*`) qua kênh SSH `direct-tcpip` kèm cơ chế dự phòng tự động sang WinRM TCP Proxy.
+  - Hỗ trợ nhập nhanh IP rút gọn 2 octet (`116.174` hoặc `116174` $\rightarrow$ `172.19.116.174`), tìm kiếm 1 hoặc nhiều Serial Number cùng lúc (`SN1, SN2`), và giới hạn số bản test mới nhất (`--latest`).
+  - **Cơ chế Selective Fast Fetch**: Chỉ nén và tải các file văn bản nhẹ cần thiết cho phân tích (`debug.log`, `results.json`, `*.log`, `ctp_log_metadata.yaml`, `job.log`, `enc_logs/*`), tự động loại bỏ các thư mục nặng (`serial_logs/`, `sysinfo/`, `.journal.sqlite`, `results.html`), giúp tải và trích xuất hoàn tất chỉ trong **1–3 giây** và tự động dọn sạch thư mục tạm (hỗ trợ đường dẫn dài `\\?\` trên Windows).
+  - Hỗ trợ cờ `--keep-raw-zip` để lưu thêm bản `.zip` đầy đủ của thư mục log vào `<App_Dir>/downloads/<IP>/` khi cần lưu trữ nguyên bản.
+- **Lưu Báo cáo Tập trung trong Thư mục Ứng dụng (`<App_Dir>/reports/`)**:
+  - Quy hoạch toàn bộ đường dẫn xuất mặc định của mọi chế độ (Remote IP+SN, Single Folder/Archive, Batch Subfolders, CSV Import, Cycle Time) về `<App_Dir>/reports/<Target_SN>/` và `<App_Dir>/reports/Cycle_Time_Summary.csv`.
+- **Nâng cấp Bóc tách Log Lỗi VPD (`VPD rendering failed`)**:
+  - Bổ sung cơ chế nhận diện điểm kết thúc dự phòng trong `extract_vpd()` và `extract_chassis_vpd()` khi bước `vpd_validation` bị dừng sớm bởi lỗi `VPD rendering failed` (ví dụ `EC(30005) VPD rendering failed for chassis FRU-REV`), đảm bảo vẫn xuất được báo cáo phần dữ liệu VPD đã chạy, cảnh báo `WARN` và tự động sinh `ERROR_SUMMARY.txt`.
+- **Đóng gói Sẵn sàng Chạy (Self-Contained Portable Runtime)**:
+  - Tích hợp sẵn `paramiko`, `cryptography`, `bcrypt`, `pynacl`, `cffi` cùng các thư viện chuẩn cần thiết vào `python_runtime` Portable.
+
+---
+
+## [v1.5.0] - 2026-10-14
+
+### 🚀 Nâng cấp & Tính năng mới (Group 1 & Group 2)
+- **Phân tích Cycle Time & Test Metadata Tự động + Xuất `Cycle_Time_Summary.csv` (Menu `[5]` / `--cycle-time`)**:
+  - Tự động trích xuất `Test duration` (Wall-clock Cycle Time từ file `<unit>.log`), thời gian chạy Avocado (`results.json`), `Start_Time`, `End_Time`, `Station_ID`, `Employee_ID`, `Part_Number`, `Script_Name` và số lượng bước test (`Total`, `Pass`, `Fail`, `Error`, `Skip`).
+  - Hiển thị trực tiếp cột `Cycle Time` trên bảng kết quả console sau mỗi lần trích xuất đơn lẻ hoặc hàng loạt.
+  - Tự động xuất bảng tổng hợp `Cycle_Time_Summary.csv` (mã hóa `utf-8-sig` mở trực tiếp bằng Excel) phục vụ báo cáo hiệu suất dây chuyền (PE/IE).
+  - Bổ sung chế độ chuyên biệt `[5]` trên Menu và cờ `--cycle-time` để quét nhanh thời gian test hàng loạt mà không cần trích xuất toàn bộ báo cáo FW/VPD.
+- **Đọc Trực tiếp File Nén Log (`.zip`, `.tar.gz`, `.tgz`, `.tar.xz`)**:
+  - Cho phép truyền trực tiếp đường dẫn file nén log vào cả chế độ đơn lẻ, quét thư mục hàng loạt và file CSV mà không cần giải nén thủ công ra ổ cứng.
+  - Cơ chế **Selective Unpacking** chỉ giải nén các file log/metadata cần thiết vào bộ nhớ tạm và tự động bỏ qua các thư mục nặng không dùng đến (`serial_logs/`, `sysinfo/`, `.journal.sqlite`, `results.html`), giúp rút ngắn thời gian đọc file nén xuống chỉ còn 1–3 giây và tự động dọn sạch thư mục tạm sau khi xử lý.
+  - Bổ sung thư viện chuẩn `lzma` và `bz2` vào `python_runtime` di động để giải nén trực tiếp các gói `obmcdump_*.tar.xz` của dòng 4U Juno.
+- **Kiểm tra Toàn vẹn Báo cáo (Sanity & Completeness Guard)**:
+  - Tự động kiểm tra số lượng file báo cáo kỳ vọng theo từng dòng sản phẩm (1 file cho 2U Chassis/PSU/RPC73, 2 file cho IO/5U Dell, 6 file cho 4U Juno) và đảm bảo dung lượng > 0 byte.
+  - Tự động quét nội dung báo cáo để cảnh báo sớm (`WARN`) nếu xuất hiện các dòng `result: mismatch`, `-> mismatch`, `| FAIL |`, hoặc `FW mismatch`.
+- **Tự động Chẩn đoán Nguyên nhân Lỗi (`ERROR_SUMMARY.txt` & `--diagnose`)**:
+  - Khi phát hiện bước kiểm thử bị `FAIL` hoặc `ERROR` trong `results.json` (hoặc khi có cảnh báo mismatch / cờ `--diagnose`), công cụ tự động trích xuất tên bước lỗi, thời gian chạy, `fail_reason` và 15 dòng log lỗi cuối cùng từ `debug.log` của bước đó để ghi ra file `ERROR_SUMMARY.txt`.
+- **Hộp thoại Chọn Thư mục/File Windows Gốc (`[B]` / `[F]`) & Phím tắt Sau Trích xuất (`[O]` / `[R]`)**:
+  - Tại mọi bước nhập đường dẫn, hỗ trợ gõ `B` (chọn thư mục) hoặc `F` (chọn file nén `.zip`/`.tar.gz`) để mở hộp thoại Windows Explorer gốc thông qua PowerShell `.NET System.Windows.Forms` (hoạt động 100% trên Python Portable không cần `tkinter`).
+  - Sau khi trích xuất xong, hiển thị thanh tác vụ nhanh: nhấn `[O]` mở ngay thư mục báo cáo vừa xuất trong Windows Explorer, `[R]` quay lại Menu chính để làm tiếp máy khác, hoặc `[Enter/Q]` để thoát.
+- **Công cụ Đối soát Mẫu Chuẩn Golden Sample (Menu `[6]` / `--verify-sample`)**:
+  - Đối chiếu tự động 100% Byte-for-Byte giữa thư mục báo cáo vừa trích xuất và thư mục mẫu chuẩn (Golden Sample) theo mã băm `SHA256`, dung lượng byte và số dòng; tự động in `unified_diff` nếu có bất kỳ dòng nào sai khác.
+- **Xử lý Hàng loạt Đa luồng (`--workers`, mặc định 4 luồng)**:
+  - Tích hợp hàng đợi đa luồng (`queue.Queue` + `threading.Thread`) kèm khóa đồng bộ hiển thị console (`_PRINT_LOCK`), tăng tốc độ trích xuất hàng loạt qua CSV hoặc quét thư mục mẹ lên gấp 3–4 lần.
+
+---
+
 ## [v1.4.0] - 2026-10-13
 
 ### 🚀 Nâng cấp & Tính năng mới

@@ -38,14 +38,16 @@ if not errorlevel 1 exit /b 0
 :launch
 cd /d "%~dp0"
 chcp 65001 >nul
-title JA_MFG_Log_Extractor v1.3.1 - Cong Cu Trich Xuat Log Tu Dong (IO, Chassis ^& PSU)
+title JA_MFG_Log_Extractor v1.6.0 - Cong Cu Trich Xuat Log Tu Dong (IO, Chassis ^& PSU)
 set "PYTHONNOUSERSITE=1"
 set "PYTHONPATH="
 
 :: Tu dong nhan dien Python Runtime:
-:: Uu tien thu muc python_runtime noi bo (ban portable), neu khong co thi dung python he thong
+:: Uu tien thu muc python_runtime noi bo (ban portable), neu khong co thi dung dist\python_runtime hoac python he thong
 if exist "%~dp0python_runtime\python.exe" (
     set "PY_EXE=%~dp0python_runtime\python.exe"
+) else if exist "%~dp0dist\python_runtime\python.exe" (
+    set "PY_EXE=%~dp0dist\python_runtime\python.exe"
 ) else (
     set "PY_EXE=python"
 )

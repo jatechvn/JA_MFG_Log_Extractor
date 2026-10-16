@@ -1,3 +1,3 @@
-# JA_MFG_Log_Extractor requires Python 3.10+
-# Zero external dependencies! Uses Python Standard Library only:
-# - os, sys, re, csv, glob, tarfile, argparse, ctypes
+# JA_MFG_Log_Extractor v1.6.0 requires Python 3.10+
+# Paramiko is required for Remote SSH/SFTP & Indirect Bridge (172.21.168.241 -> 172.19.*.*)
+paramiko>=3.0.0

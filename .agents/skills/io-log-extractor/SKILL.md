@@ -33,27 +33,40 @@ This skill provides step-by-step instructions and automated tool support to extr
 
 ---
 
-## 2. Automated Extraction via Script
+## 2. Automated Extraction via Script (v1.6.0)
 
-Run the automated Python script [`extract_mfg_logs.py`](file:///d:/JA_TESTER/LOGS_ANL/extract_mfg_logs.py):
+Run the automated Python script [`extract_mfg_logs.py`](file:///d:/OS-Software/OneDrive/OpenClaw_Workspace/JA_PROJECT/PROJECT_PY/JA_MFG_Log_Extractor/extract_mfg_logs.py):
 
-### Cách 1: Chế độ nhập tương tác (Interactive Mode - Khuyên dùng)
-Chỉ cần nháy kép chuột vào `Chay_Tool_Log.bat` trong thư mục [`MFG_Log_Extractor_PythonPortable`](file:///d:/JA_TESTER/LOGS_ANL/MFG_Log_Extractor_PythonPortable), chương trình sẽ hỗ trợ thông minh:
+### Cách 1: Chế độ nhập tương tác (Interactive Mode - 7 Chế độ)
+Nháy kép chuột vào `Chay_Tool_Log.bat` hoặc chạy trực tiếp:
 ```powershell
-python d:\JA_TESTER\LOGS_ANL\extract_mfg_logs.py
+python extract_mfg_logs.py
 ```
-**Quy trình tương tác thông minh**:
-1. **[1/3] Input Dir**: Nhập/dán đường dẫn thư mục log đầu vào.
-2. **[2/3] Target SN**: Script tự động phân tích tên thư mục input và hiển thị danh sách các SN có sẵn (`[1] SAFVN... (ctrla)` và `[2] SAFVN... (ctrlb)` với IO, hoặc tự chọn SN duy nhất với Chassis). Người dùng chỉ cần gõ `1` hoặc `2` hoặc bấm `Enter` để chọn mặc định `[1]`.
-3. **[3/3] Output Base Dir**: Script tự động đề xuất thư mục xuất mặc định chuẩn:
-   - Dòng IO (`SAF...`): Mặc định `D:\JA_TESTER\LOGS_ANL\IO`
-   - Dòng Chassis (`SGF...`): Mặc định `D:\JA_TESTER\LOGS_ANL\2U`
-   - Người dùng chỉ cần nhấn `Enter` để chọn mặc định hoặc dán đường dẫn tùy chỉnh khác.
+**7 Chế độ tương tác & Phím tắt thông minh**:
+- `[1]` Trích xuất trực tiếp từ Trạm Test qua IP + SN (Indirect Bridge `172.21.168.241` $\rightarrow$ `172.19.*.*`, Selective Fast Fetch tải nhanh trong 1–3s, lưu vào `./reports/<SN>/`).
+- `[2]` Single Folder / Archive Mode (Hỗ trợ cả thư mục và file nén `.zip`/`.tar.gz`; gõ `B` mở hộp thoại chọn thư mục, `F` mở hộp thoại chọn file nén; lưu vào `./reports/<SN>/`).
+- `[3]` Batch Subfolders & Archives Scan (Quét đệ quy đa luồng + xuất `Cycle_Time_Summary.csv`).
+- `[4]` Batch CSV Import (Đọc danh sách từ CSV/TXT đa luồng hỗ trợ cả IP và đường dẫn + xuất `Cycle_Time_Summary.csv`).
+- `[5]` Generate CSV Template (`mau_danh_sach_log.csv`).
+- `[6]` Fast Cycle Time & Failure Analyzer (Phân tích nhanh Cycle Time, Avocado duration, Station/Operator metadata & xuất `ERROR_SUMMARY.txt` nếu có lỗi).
+- `[7]` Golden Sample Diff Verifier (Đối chiếu 100% Byte-for-Byte bằng SHA256 và `unified_diff`).
+- Sau khi trích xuất, nhấn `[O]` để mở ngay thư mục kết quả trong Windows Explorer hoặc `[R]` để quay lại Menu chính.
 
 ### Cách 2: Chế độ truyền tham số dòng lệnh (Command Line Arguments)
 ```powershell
-python d:\JA_TESTER\LOGS_ANL\extract_mfg_logs.py --input-dir "<path_to_raw_test_folder>" --target-sn "<TARGET_SN>" --output-dir "<path_to_output_base_folder>"
+# Trích xuất từ xa qua Indirect Bridge vào ./reports/<SN>/:
+python extract_mfg_logs.py --ip 116.172 --sn PMV1104546G0017 --latest 1
+
+# Trích xuất 1 thư mục hoặc file nén .zip nội bộ kèm đối soát Golden Sample:
+python extract_mfg_logs.py --input-dir "<path_to_raw_log_or_zip>" --target-sn "<TARGET_SN>" --output-dir "<output_base>" --verify-sample "<sample_dir>"
+
+# Phân tích nhanh Cycle Time & xuất CSV:
+python extract_mfg_logs.py --cycle-time --input-dir "<path_to_raw_log_or_batch_dir>" --export-summary-csv "<csv_path>"
+
+# Trích xuất hàng loạt đa luồng (4 workers):
+python extract_mfg_logs.py --csv-file mau_danh_sach_log.csv --workers 4
 ```
+
 
 ---
 
