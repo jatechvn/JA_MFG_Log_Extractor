@@ -14,7 +14,7 @@ from .local_config import load_local_config
 
 
 APP_NAME = "JA_MFG_Log_Extractor"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 
 
 def get_script_dir() -> Path:
@@ -30,38 +30,52 @@ SAMPLE_CONFIG_PATH = BASE_DIR / "config_sample.json"
 REPORTS_DIR = BASE_DIR / "reports"
 DOWNLOADS_DIR = BASE_DIR / "downloads"
 LOGS_DIR = BASE_DIR / "logs"
+HISTORY_FILE = REPORTS_DIR / "recent_history.json"
 
 
 def load_active_settings() -> Dict[str, Any]:
-    """Đọc config.json. Nếu chưa tồn tại, trả về cấu hình mặc định (hoặc báo lỗi khi kết nối từ xa)."""
+    """Đọc config.json. Nếu chưa tồn tại, trả về cấu hình mặc định."""
     if CONFIG_PATH.is_file():
-        return load_local_config(CONFIG_PATH)
+        settings = load_local_config(CONFIG_PATH)
+        if "fallback_credentials" not in settings.get("ssh", {}):
+            settings["ssh"]["fallback_credentials"] = [("seagate", "seagate")]
+        return settings
     return {
         "network": {
             "client_cidr": "172.21.0.0/16",
             "target_cidr": "172.19.0.0/16",
+            "target_network": "172.19.0.0/16",
+            "client_network": "172.21.0.0/16",
             "ip_prefix": "172.19",
         },
         "ssh": {
             "username": "root",
-            "password": "",
+            "password": "seagate",
             "port": 22,
-            "fallback_credentials": [("seagate", "")],
+            "fallback_credentials": [("seagate", "seagate")],
         },
         "windows_ssh": {
             "username": "V1801179",
-            "password": "",
+            "password": "Foxconn2610",
         },
         "bridge": {
             "mode": "auto",
+            "connection": "auto",
             "transport": "auto",
             "host": "172.21.168.241",
             "ssh_port": 22,
             "winrm_port": 5985,
+            "winrm_https": False,
             "username": "V1801179",
-            "password": "",
+            "password": "Foxconn2610",
             "connect_timeout": 15,
             "target_networks": ["172.19.0.0/16"],
+        },
+        "ui": {
+            "auto_open_single": False,
+            "auto_open_batch": False,
+            "enable_clipboard_hint": True,
+            "max_recent_history": 5,
         },
     }
 
@@ -75,45 +89,51 @@ except ValueError as exc:
         "network": {
             "client_cidr": "172.21.0.0/16",
             "target_cidr": "172.19.0.0/16",
+            "target_network": "172.19.0.0/16",
+            "client_network": "172.21.0.0/16",
             "ip_prefix": "172.19",
         },
         "ssh": {
             "username": "root",
-            "password": "",
+            "password": "seagate",
             "port": 22,
-            "fallback_credentials": [],
+            "fallback_credentials": [("seagate", "seagate")],
         },
         "windows_ssh": {
             "username": "V1801179",
-            "password": "",
+            "password": "Foxconn2610",
         },
         "bridge": {
             "mode": "auto",
+            "connection": "auto",
             "transport": "auto",
             "host": "172.21.168.241",
             "ssh_port": 22,
             "winrm_port": 5985,
+            "winrm_https": False,
             "username": "V1801179",
-            "password": "",
+            "password": "Foxconn2610",
             "connect_timeout": 15,
             "target_networks": ["172.19.0.0/16"],
         },
+        "ui": {
+            "auto_open_single": False,
+            "auto_open_batch": False,
+            "enable_clipboard_hint": True,
+            "max_recent_history": 5,
+        },
     }
 
-# Thông tin đăng nhập rig test từ JSON, có thể override qua môi trường hoặc CLI.
 DEFAULT_SSH_USER = os.environ.get("LOG_DL_SSH_USER", LOCAL_SETTINGS["ssh"]["username"])
 DEFAULT_SSH_PASSWORD = os.environ.get("LOG_DL_SSH_PASSWORD", LOCAL_SETTINGS["ssh"]["password"])
 DEFAULT_SSH_PORT = int(os.environ.get("LOG_DL_SSH_PORT", LOCAL_SETTINGS["ssh"]["port"]))
 
-# Đường dẫn log mặc định trên máy đích Linux
 DEFAULT_REMOTE_BASE_PATH = os.environ.get("LOG_DL_REMOTE_PATH", "/CTP/logs/test/")
 
-# Thông tin đăng nhập SSH mặc định cho máy test Windows trong xưởng
 DEFAULT_WIN_SSH_USER = os.environ.get("LOG_DL_WIN_USER", LOCAL_SETTINGS["windows_ssh"]["username"])
 DEFAULT_WIN_SSH_PASSWORD = os.environ.get("LOG_DL_WIN_PASSWORD", LOCAL_SETTINGS["windows_ssh"]["password"])
 DEFAULT_WIN_REMOTE_BASE_PATH = os.environ.get("LOG_DL_WIN_REMOTE_PATH", "D:/JA_sendfile-seagate/SgCsvLogs")
 
-# Danh sách thư mục ứng viên quét log thông minh nếu không thấy ở đường dẫn mặc định
 LINUX_CANDIDATE_PATHS = [
     "/CTP/logs/test/",
     "/CTP/logs/",
@@ -127,8 +147,6 @@ WINDOWS_CANDIDATE_PATHS = [
     "C:/SgCsvOutput",
 ]
 
-# Dải mạng IP các máy test trong xưởng luôn cố định 2 octet đầu -> cho phép
-# người dùng chỉ gõ 2 octet cuối (vd "116.174" hoặc "116174") thay vì gõ đầy đủ IP.
 DEFAULT_IP_PREFIX = os.environ.get("LOG_DL_IP_PREFIX", LOCAL_SETTINGS["network"]["ip_prefix"])
 
 SSH_CONNECT_TIMEOUT_SEC = int(os.environ.get("LOG_DL_CONNECT_TIMEOUT", "15"))

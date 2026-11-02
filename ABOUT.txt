@@ -3,8 +3,8 @@ CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
 Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis 2U/4U/5U & PSU 2U/5U)
-Phiên bản      : 1.6.0+1
-Ngày phát hành : 2026-10-15
+Phiên bản      : 1.7.0+1
+Ngày phát hành : 2026-11-02
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
@@ -12,7 +12,7 @@ Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xu�
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
 Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG, PSU 2U DYJW5 & PSU 5U 0R4C4).
 
-TÍNH NỔI BẬT (v1.6.0):
+TÍNH NỔI BẬT (v1.7.0):
 1. Chạy Trực tiếp trên Máy Trạm & Trích xuất Từ xa qua Liên kết Gián tiếp (Indirect Bridge):
    - Kết nối trực tiếp hoặc xuyên mạng tự động từ máy kỹ sư (`172.21.*.*`) qua trạm cầu nối
      Jump-Host (`172.21.168.241` / `172.19.208.133`) tới toàn bộ trạm kiểm thử (`172.19.*.*`)
@@ -33,7 +33,7 @@ TÍNH NỔI BẬT (v1.6.0):
      và `VPD.txt` (216 dòng).
    - PSU 5U 0R4C4 (`PMV...` / `0R4C4`) & PSU 2U DYJW5 (`PMV...` / `DYJW5`): Trích xuất
      báo cáo kết hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt`
-     (116 dòng) tự động phân định `psu0` (PCM 1) và `psu1` (PCM 2).
+     (117 dòng cho 2U DYJW5 / 116 dòng cho 5U 0R4C4) tự động phân định `psu0` (PCM 1) và `psu1` (PCM 2).
    - IO Controller chuẩn (`SAF...`): Trích xuất `FW.txt` và `VPD.txt` theo `ctrla`/`ctrlb`.
    - IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'): Trích xuất `FW_VPD.txt` (139 dòng).
    - Chassis 2U (`SGF...`): Trích xuất `<SN>.txt` gồm 4 khối chuẩn.

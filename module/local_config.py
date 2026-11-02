@@ -1,4 +1,4 @@
-"""Load local JSON settings, creating a credential-free template if absent."""
+"""Load local JSON settings, creating a default template if absent."""
 import ipaddress
 import json
 import logging
@@ -6,7 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict
 
-logger = logging.getLogger("log_downloader.config")
+logger = logging.getLogger("ja_mfg_extractor.config")
 
 DEFAULT_SETTINGS = {
     "network": {
@@ -17,14 +17,27 @@ DEFAULT_SETTINGS = {
     "bridge": {
         "host": "172.21.168.241",
         "username": "V1801179",
-        "password": "",
+        "password": "Foxconn2610",
         "connection": "auto",
         "transport": "auto",
         "ssh_port": 22,
         "winrm_https": False,
     },
-    "ssh": {"username": "root", "password": "", "port": 22},
-    "windows_ssh": {"username": "V1801179", "password": ""},
+    "ssh": {
+        "username": "root",
+        "password": "seagate",
+        "port": 22,
+    },
+    "windows_ssh": {
+        "username": "V1801179",
+        "password": "Foxconn2610",
+    },
+    "ui": {
+        "auto_open_single": False,
+        "auto_open_batch": False,
+        "enable_clipboard_hint": True,
+        "max_recent_history": 5,
+    },
 }
 
 
@@ -36,7 +49,6 @@ def load_local_config(path: Path) -> Dict:
                 json.dump(DEFAULT_SETTINGS, stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
         except FileExistsError:
-            # Another process created it between the existence check and open.
             logger.debug("File cấu hình đã được tiến trình khác tạo: %s", path)
         except OSError as exc:
             raise ValueError(f"Không tạo được file cấu hình: {path}") from exc
@@ -77,6 +89,8 @@ def _validate_settings(settings: Dict, path: Path) -> None:
         if settings["bridge"]["connection"] not in ("auto", "direct", "bridge"):
             raise ValueError()
         if settings["bridge"]["transport"] not in ("auto", "ssh", "winrm"):
+            raise ValueError()
+        if settings["ui"]["max_recent_history"] < 1:
             raise ValueError()
     except ValueError as exc:
         raise ValueError(f"IP, dải mạng, cổng hoặc chế độ kết nối không hợp lệ trong {path}.") from exc

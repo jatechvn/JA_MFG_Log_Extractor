@@ -7,7 +7,7 @@
   "bridge": {
     "host": "172.21.168.241",
     "username": "V1801179",
-    "password": "",
+    "password": "Foxconn2610",
     "connection": "auto",
     "transport": "auto",
     "ssh_port": 22,
@@ -15,11 +15,17 @@
   },
   "ssh": {
     "username": "root",
-    "password": "",
+    "password": "seagate",
     "port": 22
   },
   "windows_ssh": {
     "username": "V1801179",
-    "password": ""
+    "password": "Foxconn2610"
+  },
+  "ui": {
+    "auto_open_single": false,
+    "auto_open_batch": false,
+    "enable_clipboard_hint": true,
+    "max_recent_history": 5
   }
 }

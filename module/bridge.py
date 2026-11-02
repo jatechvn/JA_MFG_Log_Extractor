@@ -112,30 +112,54 @@ class BridgeConnector:
         self._client: Optional[paramiko.SSHClient] = None
         self._selected_transport = settings.transport
 
+    def _candidate_passwords(self) -> list[str]:
+        pwd = self.settings.resolve_password()
+        cands = [pwd]
+        alt = pwd[:-1] if pwd.endswith(".") else (pwd + ".")
+        if alt and alt not in cands:
+            cands.append(alt)
+        return cands
+
     def open_socket(self, host: str, port: int, timeout: int) -> Union[paramiko.Channel, WinRMSocket]:
-        password = self.settings.resolve_password()
+        passwords = self._candidate_passwords()
         if self._selected_transport in ("auto", "ssh"):
+            last_ssh_exc = None
+            for pwd in passwords:
+                try:
+                    channel = self._open_ssh(host, port, pwd, timeout)
+                    self.settings.password = pwd
+                    self._selected_transport = "ssh"
+                    return channel
+                except paramiko.AuthenticationException as exc:
+                    last_ssh_exc = exc
+                    self.close()
+                    continue
+                except (paramiko.SSHException, OSError) as exc:
+                    last_ssh_exc = exc
+                    self.close()
+                    break
+            if self._selected_transport == "ssh" and last_ssh_exc is not None:
+                raise SshConnectionError(
+                    f"SSH bridge {self.settings.host} thất bại: {type(last_ssh_exc).__name__}"
+                ) from last_ssh_exc
+            logger.info("SSH bridge không khả dụng; thử WinRM qua %s", self.settings.host)
+            self._selected_transport = "winrm"
+
+        last_winrm_exc = None
+        for pwd in passwords:
             try:
-                channel = self._open_ssh(host, port, password, timeout)
-                self._selected_transport = "ssh"
-                return channel
-            except (paramiko.SSHException, OSError) as exc:
-                self.close()
-                if self._selected_transport == "ssh":
-                    raise SshConnectionError(
-                        f"SSH bridge {self.settings.host} thất bại: {type(exc).__name__}"
-                    ) from exc
-                logger.info("SSH bridge không khả dụng; thử WinRM qua %s", self.settings.host)
-                self._selected_transport = "winrm"
-        try:
-            return WinRMSocket(
-                self.settings.host, self.settings.username, password,
-                host, port, timeout, self.settings.winrm_https,
-            )
-        except (OSError, ValueError) as exc:
-            raise SshConnectionError(
-                f"WinRM bridge {self.settings.host} thất bại: {exc}"
-            ) from exc
+                sock = WinRMSocket(
+                    self.settings.host, self.settings.username, pwd,
+                    host, port, timeout, self.settings.winrm_https,
+                )
+                self.settings.password = pwd
+                return sock
+            except (OSError, ValueError) as exc:
+                last_winrm_exc = exc
+                continue
+        raise SshConnectionError(
+            f"WinRM bridge {self.settings.host} thất bại: {last_winrm_exc}"
+        ) from last_winrm_exc
 
     def _open_ssh(self, host: str, port: int, password: str, timeout: int) -> paramiko.Channel:
         if self._client is None:

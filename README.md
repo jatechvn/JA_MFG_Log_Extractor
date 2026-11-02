@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.6.0-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -22,7 +22,12 @@
 
 ---
 
-## 🚀 Tính năng nổi bật (v1.6.0)
+## 🚀 Tính năng nổi bật (v1.7.0)
+
+- Bảng log có kết quả PASS/FAIL/RUN, thời gian bắt đầu và thời gian cập nhật file cuối; co cột trên terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn.
+- Chọn `P`/`F` chỉ lấy gói khớp kết quả; nếu không có gói phù hợp, chương trình yêu cầu chọn lại.
+- Sơ đồ 3 Line, gợi ý Clipboard/lịch sử IP và SN, tái sử dụng SSH theo máy test, mở thư mục `[O]`, copy đường dẫn `[C]` và xuất `retry_failed.csv`.
+- `--list-only` chỉ liệt kê, không tải log và không cập nhật lịch sử hoặc đường dẫn báo cáo gần nhất.
 
 - 🌐 **Trích xuất Trực tiếp Từ xa qua Liên kết Gián tiếp (Indirect Bridge `172.21.168.241` $\rightarrow$ `172.19.*.*`)**:
   - Chạy trực tiếp trên máy kỹ sư (`172.21.*.*`), tự động định tuyến trực tiếp hoặc qua trạm cầu nối Jump-Host (`172.21.168.241` / `172.19.208.133`) tới các trạm test (`172.19.*.*`) bằng SSH `direct-tcpip` kèm cơ chế fallback tự động sang WinRM TCP Proxy.

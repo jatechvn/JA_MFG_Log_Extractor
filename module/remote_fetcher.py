@@ -30,7 +30,7 @@ import paramiko
 from . import config
 from .bridge import BridgeConnector, BridgeSettings, should_use_bridge
 from .exceptions import DownloadError, RemoteCommandError, SshConnectionError
-from .log_finder import RemoteLogEntry
+from .log_finder import RemoteLogEntry, extract_start_epoch_from_name
 from .path_utils import normalize_remote_path, safe_mkdir, to_long_path
 
 logger = logging.getLogger("ja_mfg_extractor.remote_fetcher")
@@ -89,9 +89,11 @@ def build_credentials_chain(
 
     win_user = config.DEFAULT_WIN_SSH_USER
     win_pass = config.DEFAULT_WIN_SSH_PASSWORD
-    if win_user and win_pass and (win_user, win_pass) != (primary_user, primary_pass):
-        if (win_user, win_pass) not in fallbacks:
-            fallbacks.append((win_user, win_pass))
+    if win_user and win_pass:
+        for cand_pw in (win_pass, win_pass[:-1] if win_pass.endswith(".") else f"{win_pass}."):
+            if cand_pw and (win_user, cand_pw) != (primary_user, primary_pass):
+                if (win_user, cand_pw) not in fallbacks:
+                    fallbacks.append((win_user, cand_pw))
 
     return primary_user, primary_pass, fallbacks
 
@@ -244,6 +246,14 @@ class SshLogService:
                 self.remote_os = "linux"
         except Exception:
             self.remote_os = "linux"
+
+    @property
+    def is_connected(self) -> bool:
+        """Kiểm tra phiên SSH hiện tại còn đang hoạt động hay không."""
+        if self._ssh_client is None:
+            return False
+        transport = self._ssh_client.get_transport()
+        return bool(transport and transport.is_active())
 
     def disconnect(self) -> None:
         if self._ssh_client is not None:
@@ -594,32 +604,98 @@ class SshLogService:
 
     @staticmethod
     def _build_linux_find_command(remote_base_path: str, serial_number: str) -> str:
+        # Chạy find kết hợp 1 lệnh sh duy nhất để lấy:
+        # 1. end_mtime: thời điểm kết thúc ghi log / đẩy MES (max mtime của thư mục, <name>.log, ctp_log_metadata.yaml, mesdetails.log)
+        # 2. test_result: PASS / FAIL / RUN / - dựa trên ctp_log_metadata.yaml và 256 KB cuối của <name>.log
+        sh_script = (
+            'for p in "$@"; do '
+            'name=${p##*/}; '
+            'if [ -d "$p" ]; then '
+            '  tp="d"; '
+            '  end_m=$(stat -c "%Y" "$p" "$p/$name.log" "$p/ctp_log_metadata.yaml" "$p/mesdetails.log" 2>/dev/null | sort -nr | head -n 1); '
+            '  res="-"; '
+            '  meta="$p/ctp_log_metadata.yaml"; '
+            '  logf="$p/$name.log"; '
+            '  if [ -f "$meta" ]; then '
+            '    if grep -Eq "FAIL_CODE:|TEST_STATUS:[[:space:]]*(ERROR|STOPPED|FAIL)" "$meta" 2>/dev/null; then res="FAIL"; '
+            '    elif grep -Eq "TEST_STATUS:[[:space:]]*COMPLETED" "$meta" 2>/dev/null; then res="PASS"; '
+            '    elif grep -Eq "TEST_STATUS:[[:space:]]*RUNNING" "$meta" 2>/dev/null; then res="RUN"; fi; '
+            '  fi; '
+            '  if [ "$res" = "-" ] || [ "$res" = "RUN" ]; then '
+            '    if [ -f "$logf" ]; then '
+            '      tail_txt=$(tail -c 262144 "$logf" 2>/dev/null); '
+            '      if printf "%s" "$tail_txt" | grep -Eq "Failure routine duration:|Script .* failed|FAIL_CODE|updated test FAIL"; then res="FAIL"; '
+            '      elif printf "%s" "$tail_txt" | grep -Eq "Script .* passed|updated test PASS successfully|FIS .PUT. PASS"; then res="PASS"; fi; '
+            '    fi; '
+            '  fi; '
+            'else '
+            '  tp="f"; '
+            '  end_m=$(stat -c "%Y" "$p" 2>/dev/null); '
+            '  res="-"; '
+            'fi; '
+            'printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$name" "${end_m:-0}" "$tp" "$res" "$p"; '
+            'done'
+        )
         args = [
             "find",
             remote_base_path,
             "-mindepth", "1",
             "-maxdepth", "1",
             "-iname", f"*{serial_number}*",
-            "-printf", "%f\\t%T@\\t%y\\n",
+            "-exec", "sh", "-c", sh_script, "_", "{}", "+",
         ]
         return " ".join(shlex.quote(arg) for arg in args)
 
     @staticmethod
     def _build_windows_find_command(remote_base_path: str, serial_number: str) -> str:
         import base64
-        win_base = remote_base_path.replace("/", "\\")
+        win_base = remote_base_path.replace("/", "\\").replace("'", "''")
+        safe_sn = serial_number.replace("'", "''")
         ps_cmd = (
             f"Get-ChildItem -LiteralPath '{win_base}' -Depth 1 -Force -ErrorAction SilentlyContinue | "
-            f"Where-Object {{ $_.Name -like '*{serial_number}*' }} | "
+            f"Where-Object {{ $_.Name -like '*{safe_sn}*' }} | "
             f"ForEach-Object {{ "
-            f"$t = ([DateTimeOffset]$_.LastWriteTime).ToUnixTimeSeconds(); "
+            f"$endT = $_.LastWriteTime; $res = '-'; "
+            f"if ($_.PSIsContainer) {{ "
+            f"  $meta = Join-Path $_.FullName 'ctp_log_metadata.yaml'; "
+            f"  $logf = Join-Path $_.FullName ($_.Name + '.log'); "
+            f"  $mesf = Join-Path $_.FullName 'mesdetails.log'; "
+            f"  foreach ($f in @($meta, $logf, $mesf)) {{ "
+            f"    if (Test-Path -LiteralPath $f) {{ "
+            f"      $ft = (Get-Item -LiteralPath $f).LastWriteTime; "
+            f"      if ($ft -gt $endT) {{ $endT = $ft }} "
+            f"    }} "
+            f"  }}; "
+            f"  if (Test-Path -LiteralPath $meta) {{ "
+            f"    $mc = Get-Content -LiteralPath $meta -Raw -ErrorAction SilentlyContinue; "
+            f"    if ($mc -match 'FAIL_CODE:|TEST_STATUS:\\s*(ERROR|STOPPED|FAIL)') {{ $res = 'FAIL' }} "
+            f"    elseif ($mc -match 'TEST_STATUS:\\s*COMPLETED') {{ $res = 'PASS' }} "
+            f"    elseif ($mc -match 'TEST_STATUS:\\s*RUNNING') {{ $res = 'RUN' }} "
+            f"  }}; "
+            f"  if (($res -eq '-' -or $res -eq 'RUN') -and (Test-Path -LiteralPath $logf)) {{ "
+            f"    $lt = (Get-Content -LiteralPath $logf -Tail 80 -ErrorAction SilentlyContinue) -join \"`n\"; "
+            f"    if ($lt -match 'Failure routine duration:|Script .* failed|FAIL_CODE') {{ $res = 'FAIL' }} "
+            f"    elseif ($lt -match 'Script .* passed|updated test PASS successfully|FIS ''PUT'' PASS') {{ $res = 'PASS' }} "
+            f"  }} "
+            f"}}; "
+            f"$t = ([DateTimeOffset]$endT).ToUnixTimeSeconds(); "
             f"$k = if ($_.PSIsContainer) {{ 'd' }} else {{ 'f' }}; "
             f"$p = $_.FullName.Replace('\\','/'); "
-            f"Write-Output \"$($_.Name)`t$t`t$k`t$p\" "
+            f"Write-Output \"$($_.Name)`t$t`t$k`t$res`t$p\" "
             f"}}"
         )
         b64 = base64.b64encode(ps_cmd.encode("utf-16le")).decode("ascii")
         return f"powershell -NoProfile -NonInteractive -EncodedCommand {b64}"
+
+    @staticmethod
+    def _infer_result_from_name(name: str) -> str:
+        """Dự đoán PASS/FAIL từ tên file/thư mục nếu không có metadata bên trong."""
+        upper = name.upper()
+        if re.search(r"(?:^|[_\-\.])PASS(?:$|[_\-\.])", upper):
+            return "PASS"
+        if re.search(r"(?:^|[_\-\.])FAIL(?:$|[_\-\.])", upper):
+            return "FAIL"
+        return "-"
 
     @staticmethod
     def _parse_find_output(output: str, remote_base_path: str) -> List[RemoteLogEntry]:
@@ -633,7 +709,25 @@ class SshLogService:
             if len(parts) < 3:
                 continue
             name, mtime_str, type_char = parts[0], parts[1], parts[2]
-            full_remote = parts[3].strip() if len(parts) >= 4 and parts[3].strip() else f"{clean_base}/{name}"
+            test_result = "-"
+            full_remote = f"{clean_base}/{name}"
+
+            if len(parts) == 4:
+                p3 = parts[3].strip()
+                if p3.upper() in ("PASS", "FAIL", "RUN", "-"):
+                    test_result = p3.upper()
+                elif p3:
+                    full_remote = p3
+            elif len(parts) >= 5:
+                p3 = parts[3].strip().upper()
+                if p3 in ("PASS", "FAIL", "RUN", "-"):
+                    test_result = p3
+                if parts[4].strip():
+                    full_remote = parts[4].strip()
+
+            if test_result == "-":
+                test_result = SshLogService._infer_result_from_name(name)
+
             entry_type = "dir" if type_char == "d" else "file"
             try:
                 mtime_epoch = float(mtime_str)
@@ -645,6 +739,8 @@ class SshLogService:
                     remote_path=normalize_remote_path(full_remote),
                     mtime_epoch=mtime_epoch,
                     entry_type=entry_type,
+                    test_result=test_result,
+                    start_time_epoch=extract_start_epoch_from_name(name),
                 )
             )
         return entries

@@ -3,11 +3,11 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 echo ===============================================================================
-echo   DONG GOI BAN PHAT HANH JA_MFG_Log_Extractor v1.6.0
+echo   DONG GOI BAN PHAT HANH JA_MFG_Log_Extractor v1.7.0
 echo ===============================================================================
 
 set "APP_NAME=JA_MFG_Log_Extractor"
-set "APP_VERSION=1.6.0"
+set "APP_VERSION=1.7.0"
 set "ZIP_NAME=%APP_NAME%_v%APP_VERSION%_Windows_x64.zip"
 set "DIST_DIR=%~dp0dist"
 set "PACK_DIR=%~dp0dist_pack\%APP_NAME%_v%APP_VERSION%_Windows_x64"
@@ -38,6 +38,7 @@ echo [*] Dang sao chep ma nguon, module va tai lieu...
 copy /y "%~dp0extract_mfg_logs.py" "%PACK_DIR%\" >nul
 copy /y "%~dp0Chay_Tool_Log.bat" "%PACK_DIR%\" >nul
 copy /y "%~dp0config_sample.json" "%PACK_DIR%\" >nul
+if exist "%~dp0config.json" copy /y "%~dp0config.json" "%PACK_DIR%\" >nul
 copy /y "%~dp0mau_danh_sach_log.csv" "%PACK_DIR%\" >nul
 copy /y "%~dp0ABOUT.txt" "%PACK_DIR%\" >nul
 copy /y "%~dp0README.md" "%PACK_DIR%\" >nul

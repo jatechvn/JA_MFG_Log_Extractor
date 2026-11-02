@@ -7,6 +7,19 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.7.0] - 2026-11-02
+
+### Nâng cấp
+- Bảng log PASS/FAIL/RUN, thời gian bắt đầu và cập nhật cuối; chọn nhanh P/F/L/A hoặc dải số.
+- Sơ đồ 3 Line, gợi ý Clipboard và lịch sử IP/SN; tái sử dụng SSH theo host, fail-fast và xuất `retry_failed.csv`.
+- Mở thư mục `[O]`, copy đường dẫn `[C]`, tiếp tục tìm SN trên cùng máy; PSU 2U giữ thêm dòng hex `00a0:` (117 dòng).
+
+### Sửa lỗi
+- Yêu cầu chọn lại khi P/F không có gói khớp, không tự chuyển sang gói có kết quả khác.
+- Co bảng cho terminal 80 cột và dùng danh sách ở cửa sổ hẹp để tránh xuống dòng sai cột.
+- `--list-only` không thay đổi history; unit test sử dụng history tạm riêng.
+- Đồng bộ launcher, tài liệu, requirements và metadata package lên v1.7.0.
+
 ## [v1.6.0] - 2026-10-15
 
 ### 🚀 Nâng cấp & Tính năng mới

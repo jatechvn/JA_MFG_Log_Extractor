@@ -1,6 +1,14 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.6.0
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.7.0
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình kết nối từ xa (Indirect Bridge) và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE), kỹ sư phân tích lỗi (FA) và nhân viên vận hành trạm test.
+
+### Thao tác mới trong v1.7.0
+
+- Chọn IP trên sơ đồ 3 Line bằng phím mũi tên hoặc nhập `.174`, `174`, `116.174`. Clipboard và lịch sử hỗ trợ gợi ý IP/SN.
+- Trong bảng log, `P` chỉ chọn PASS, `F` chỉ chọn FAIL, `L` chọn mới nhất, `A` chọn tất cả; hỗ trợ `1-3, 5`. Không có gói khớp thì chương trình yêu cầu chọn lại; `Ctrl+C` hủy thao tác.
+- Bảng tự co cho terminal 80 cột; cửa sổ hẹp hơn dùng danh sách để giữ đầy đủ thời gian.
+- `--ip .174 --sn <SN> --list-only` chỉ xem kết quả, không tải log và không ghi lịch sử. Cột kết thúc dựa trên thời gian cập nhật file, không xác nhận thời điểm MES nhận dữ liệu.
+- Sau trích xuất: `[1]` tìm SN tiếp trên cùng phiên SSH, `[2]` đổi máy, `[O]` mở thư mục, `[C]` copy đường dẫn. Batch xuất các mục lỗi vào `retry_failed.csv` để chạy lại.
 
 ---
 
@@ -44,7 +52,7 @@ Khi khởi động, màn hình menu chính hiển thị 7 lựa chọn. Toàn b�
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.6.0  │
+│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.7.0  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:
@@ -60,11 +68,12 @@ Vui lòng chọn chế độ làm việc:
 ```
 
 ### Chế độ [1]: 🌐 Trích xuất trực tiếp từ Máy Trạm Từ Xa qua IP + SN (Indirect Bridge -> `./reports`)
-- **Bước 1**: Nhập địa chỉ IP máy trạm test. Hỗ trợ 3 định dạng:
-  - Rút gọn 2 octet có dấu chấm: `116.174` $\rightarrow$ tự động mở rộng thành `172.19.116.174`
-  - Rút gọn 6 chữ số liền: `116174` $\rightarrow$ tự động mở rộng thành `172.19.116.174`
-  - IP đầy đủ: `172.19.116.174`
-- **Bước 2**: Nhập 1 hoặc nhiều Serial Number cần lấy báo cáo, phân tách bằng dấu phẩy (ví dụ: `SGFVN2633836284` hoặc `PMV1104546G0017, PMV1104546G002E`).
+- **Bước 1**: Chọn trên **Sơ đồ IP 3 Line (`Line 3` │ `Line 2` │ `Line 1`)** hoặc nhập thủ công địa chỉ IP máy trạm test:
+  - **Chọn trực quan trên Sơ đồ**: Dùng phím mũi tên `↑` `↓` `←` `→` di chuyển qua 60 trạm trong `Line 3 (.172–.199)`, `Line 2 (.141–.160)`, `Line 1 (.121–.140)` và nhấn `Enter` để chọn.
+  - **Gõ tắt 1 octet theo sơ đồ**: `.174` hoặc `174` $\rightarrow$ tự động mở rộng thành `172.19.116.174`
+  - **Gõ tắt 2 octet cuối**: `116.174` hoặc `116174` $\rightarrow$ tự động mở rộng thành `172.19.116.174`
+  - **IP đầy đủ bất kỳ**: `172.19.116.174`, `172.21.168.241`, v.v.
+- **Bước 2**: Nhập 1 hoặc nhiều Serial Number cần lấy báo cáo, phân tách bằng dấu phẩy (hoặc nhấn `Enter` để tự động lấy SN từ Clipboard).
 - **Bước 3**: Chọn số lượng bản log mới nhất cần lấy cho mỗi SN (nhấn `Enter` để mặc định lấy `1` bản mới nhất, hoặc nhập `0` để lấy tất cả).
 - **Bước 4**: Chọn có lưu lại bản nén `.zip` gốc đầy đủ vào `./downloads/<IP>/` hay không (nhấn `Enter` = Không, chỉ tải chọn lọc **Selective Fast Fetch** và trích xuất thẳng vào `./reports/<SN>/` trong 1–3 giây).
 - **Sau khi hoàn tất**:
@@ -101,7 +110,7 @@ Vui lòng chọn chế độ làm việc:
 - **Chassis 5U Dell (`SGF...` / `W47DG` / `5U84`)**: `FW.txt` (21 dòng), `VPD.txt` (216 dòng).
 - **Chassis 2U (`SGF...`)**: `<SN>.txt`.
 - **Chassis 4U Juno (`FVB...`)**: Bộ 6 file (`FW.txt`, `GETVPD.txt`, `VER.txt`, `VPD.txt`, `Restore Default.txt`, `Provisioning State.txt`).
-- **PSU 2U & 5U (`PMV...` / `DYJW5` / `0R4C4`)**: `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (116 dòng).
+- **PSU 2U & 5U (`PMV...` / `DYJW5` / `0R4C4`)**: `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` (117 dòng cho 2U `DYJW5` / 116 dòng cho 5U `0R4C4`).
 - **Báo cáo Phụ trợ & Chẩn đoán Tự động**:
   - **`reports/Cycle_Time_Summary.csv`**: Chứa 24 cột thống kê thời gian test, trạm test, nhân viên và trạng thái từng máy.
   - **`reports/<SN>/ERROR_SUMMARY.txt`**: Tự động sinh ra khi máy test có bước `FAIL`/`ERROR`, dừng giữa chừng (`VPD rendering failed`), hoặc có cảnh báo `mismatch`.

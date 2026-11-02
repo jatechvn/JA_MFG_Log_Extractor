@@ -16,14 +16,7 @@ from typing import Union
 
 
 def to_long_path(path: Union[str, Path]) -> str:
-    """Chuyển đổi đường dẫn tuyệt đối sang định dạng Extended-Length Path trên Windows.
-
-    - Nếu chạy trên Linux/macOS: giữ nguyên đường dẫn chuỗi.
-    - Nếu chạy trên Windows:
-      * 'D:\\folder\\file' -> '\\\\?\\D:\\folder\\file'
-      * '\\\\server\\share' (UNC) -> '\\\\?\\UNC\\server\\share'
-      * Đã có tiền tố '\\\\?\\' thì giữ nguyên.
-    """
+    """Chuyển đổi đường dẫn tuyệt đối sang định dạng Extended-Length Path trên Windows."""
     path_str = str(path)
     if not path_str:
         return path_str
@@ -39,11 +32,24 @@ def to_long_path(path: Union[str, Path]) -> str:
         return abs_path
 
     if abs_path.startswith("\\\\"):
-        # UNC path: \\server\share -> \\?\UNC\server\share
         return "\\\\?\\UNC\\" + abs_path[2:]
 
-    # Local drive path: D:\path -> \\?\D:\path
     return "\\\\?\\" + abs_path
+
+
+def to_standard_path(path: Union[str, Path]) -> str:
+    """Chuyển đổi đường dẫn có tiền tố Extended-Length (\\\\?\\) về đường dẫn chuẩn
+    để hiển thị hoặc truyền vào Windows Explorer / Clipboard.
+    """
+    path_str = str(path)
+    if not path_str:
+        return path_str
+
+    if path_str.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + path_str[8:]
+    if path_str.startswith("\\\\?\\"):
+        return path_str[4:]
+    return os.path.abspath(path_str) if sys.platform == "win32" and not path_str.startswith("\\\\") else path_str
 
 
 def safe_mkdir(path: Union[str, Path]) -> Path:
@@ -72,7 +78,6 @@ def safe_remove(path: Union[str, Path]) -> None:
         try:
             shutil.rmtree(long_p, onerror=_handle_remove_readonly)
         except TypeError:
-            # Python 3.12+ hỗ trợ on_exc
             shutil.rmtree(long_p, on_exc=lambda fn, p, exc: _handle_remove_readonly(fn, p, None))
     else:
         try:
@@ -83,33 +88,22 @@ def safe_remove(path: Union[str, Path]) -> None:
 
 
 def normalize_remote_path(path: str) -> str:
-    """Chuẩn hóa đường dẫn từ xa để dùng với SFTP (OpenSSH trên cả Linux và Windows).
-
-    SFTP luôn ưu tiên dấu gạch chéo xuôi '/', loại bỏ dấu gạch chéo ngược '\\'.
-    Ví dụ: 'D:\\logs\\test' -> 'D:/logs/test'.
-    """
+    """Chuẩn hóa đường dẫn từ xa để dùng với SFTP (OpenSSH trên cả Linux và Windows)."""
     if not path:
         return ""
     normalized = path.replace("\\", "/").strip()
-    # Rút gọn các dấu gạch chéo liên tiếp (trừ trường hợp UNC //)
     while "//" in normalized and not normalized.startswith("//"):
         normalized = normalized.replace("//", "/")
     return normalized
 
 
 def check_disk_space(target_path: Union[str, Path], min_bytes: int = 1024 * 1024 * 1024) -> tuple[bool, int, int]:
-    """Kiểm tra dung lượng đĩa trống tại thư mục target_path.
-
-    Trả về: (đủ_dung_lượng: bool, dung_lượng_trống_bytes: int, tổng_dung_lượng_bytes: int).
-    """
+    """Kiểm tra dung lượng đĩa trống tại thư mục target_path."""
     try:
         check_dir = os.path.abspath(str(target_path))
-        # Nếu thư mục chưa tồn tại, kiểm tra thư mục cha
         while not os.path.exists(check_dir) and os.path.dirname(check_dir) != check_dir:
             check_dir = os.path.dirname(check_dir)
         usage = shutil.disk_usage(check_dir)
         return (usage.free >= min_bytes, usage.free, usage.total)
     except Exception:
-        # Nếu không lấy được dung lượng (vd phân vùng đặc biệt), coi như hợp lệ
         return (True, 0, 0)
-

@@ -1,9 +1,17 @@
-TAG=v1.6.0
-TITLE=JA_MFG_Log_Extractor v1.6.0 — Trích xuất Trực tiếp Từ xa qua Indirect Bridge & Lưu Báo cáo Tập trung tại reports/
+TAG=v1.7.0
+TITLE=JA_MFG_Log_Extractor v1.7.0 — Chọn log theo kết quả, sơ đồ IP và thao tác nhanh
 BODY=
-## JA_MFG_Log_Extractor v1.6.0 — Trích xuất Trực tiếp Từ xa qua Indirect Bridge & Lưu Báo cáo Tập trung tại `reports/`
+## JA_MFG_Log_Extractor v1.7.0 — Chọn log theo kết quả, sơ đồ IP và thao tác nhanh
 
-Bản cập nhật lớn **v1.6.0** tích hợp cơ chế kết nối gián tiếp xuyên mạng (**Indirect Bridge `172.21.168.241` $\rightarrow$ `172.19.*.*`**) từ hệ sinh thái `seagate_log_downloader`, cho phép chạy ứng dụng trực tiếp trên máy cá nhân để tìm kiếm và trích xuất báo cáo từ trạm test trong 1–3 giây mà không cần tải toàn bộ gói log nặng, đồng thời quy hoạch toàn bộ báo cáo phân tích vào thư mục `<App_Dir>/reports/`.
+Bản cập nhật **v1.7.0** bổ sung chọn log theo PASS/FAIL, sơ đồ IP 3 Line, gợi ý Clipboard/lịch sử và thao tác nhanh khi phân tích log tại `<App_Dir>/reports/`.
+
+### Thay đổi trong v1.7.0
+- Chọn `P`/`F` chỉ lấy gói có kết quả phù hợp; không có gói khớp thì yêu cầu chọn lại. Hỗ trợ `L`, `A` và dải số.
+- Bảng co cho terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn. Thời gian kết thúc dựa trên mtime của file, không phải xác nhận độc lập từ MES.
+- Sơ đồ 3 Line, IP rút gọn, gợi ý Clipboard và lịch sử 5 IP/SN gần nhất; `[O]` mở báo cáo, `[C]` copy đường dẫn.
+- Tái sử dụng SSH trên cùng máy, fail-fast theo host và xuất `retry_failed.csv` khi batch lỗi.
+- `--list-only` không tải log và không cập nhật history; unit test cô lập history để bảo toàn dữ liệu thật.
+- Launcher và tài liệu đồng bộ v1.7.0. PSU 2U giữ dòng hex `00a0:` trong báo cáo 117 dòng.
 
 ### Điểm nhấn chính:
 - **Chạy Trực tiếp & Trích xuất Từ xa qua Liên kết Gián tiếp (Menu `[1]` / `--ip` & `--sn`)**:
@@ -18,4 +26,4 @@ Bản cập nhật lớn **v1.6.0** tích hợp cơ chế kết nối gián ti�
   - Tích hợp sẵn `paramiko`, `cryptography`, `bcrypt`, `pynacl` cùng các thư viện chuẩn cần thiết vào `python_runtime` Portable — chạy ngay trên mọi máy Windows không cần cài đặt Python hay thư viện ngoài.
 
 ### Cài đặt & Sử dụng:
-Giải nén gói `JA_MFG_Log_Extractor_v1.6.0_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
+Giải nén gói `JA_MFG_Log_Extractor_v1.7.0_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` nếu chưa có (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Giữ lại cấu hình và dữ liệu reports/downloads đang dùng khi cập nhật. Xem chi tiết tại `USERGUIDE.md` và `README.md`.

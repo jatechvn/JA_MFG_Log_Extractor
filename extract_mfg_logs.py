@@ -19,7 +19,7 @@ import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 APP_BUILD = "1"
 
 _PRINT_LOCK = threading.Lock()
@@ -1059,7 +1059,9 @@ def extract_psu_logs(test_results_dir, target_sn):
     Extract 'Controller FW, Drive FW, Serial Number Tracking & Test History.txt' for PSU units (2U & 5U).
     - Section 1 (Step 6/7): PCM 1 & 2 firmware, VPD structure, and VPD CRC (6 lines)
     - Section 2 (Step 6): VPD 40 (psu0) or VPD 41 (psu1) hex dump (0000: to 0050:)
-    - Section 3 (Step 7): VPD 60 (psu0) or VPD 61 (psu1) hex dump (0000: to 0090: + blank line + 0360: to 0390:)
+    - Section 3 (Step 7): VPD 60 (psu0) or VPD 61 (psu1) hex dump:
+        * PSU 2U (DYJW5): 0000: to 00a0: + blank line + 0360: to 0390: (117 lines total)
+        * PSU 5U (0R4C4): 0000: to 0090: + blank line + 0360: to 0390: (116 lines total)
     - Section 4 (Step 7): Customer VPD validation table (84 lines)
     """
     s6_dir = find_step_dir(test_results_dir, "write_vpd")
@@ -1102,7 +1104,13 @@ def extract_psu_logs(test_results_dir, target_sn):
                 if parts[0].startswith("0050:"):
                     break
 
-    # Section 3: VPD 60 / 61 hex from Step 7 (0000: to 0090: + blank line + 0360: to 0390:)
+    # Section 3: VPD 60 / 61 hex from Step 7
+    # - PSU 5U (0R4C4): 0000: to 0090: + blank line + 0360: to 0390: (116 lines total)
+    # - PSU 2U (DYJW5): 0000: to 00a0: + blank line + 0360: to 0390: (117 lines total)
+    is_psu_5u = any("0R4C4" in l or "PWR SPLY,5U" in l for l in s7)
+    upper_hex_end = 0xa0 if is_psu_5u else 0xb0
+    last_upper_addr = "0090" if is_psu_5u else "00a0"
+
     s3_lines = []
     target_v6x_hdr_marker = f"|0608|VPD {vpd_cust_id} (1) - PSMI PCM {pcm_num} Customer"
     in_v6x = False
@@ -1115,13 +1123,13 @@ def extract_psu_logs(test_results_dir, target_sn):
             in_v6x = True
             continue
         if in_v6x:
-            m = re.search(r'\|0509\|(\d{4}:.+)$', l)
+            m = re.search(r'\|0509\|([0-9a-fA-F]{4}:.+)$', l)
             if m:
                 hex_part = m.group(1).rstrip()
-                addr = hex_part[:4]
-                if addr in [f"{x:04x}" for x in range(0, 0xa0, 0x10)]:
+                addr = hex_part[:4].lower()
+                if addr in [f"{x:04x}" for x in range(0, upper_hex_end, 0x10)]:
                     s3_lines.append(hex_part)
-                    if addr == "0090":
+                    if addr == last_upper_addr:
                         s3_lines.append("")
                 elif addr in ["0360", "0370", "0380", "0390"]:
                     s3_lines.append(hex_part)
@@ -2288,25 +2296,31 @@ def process_remote_extraction(
     interactive=False,
     export_csv=True,
     custom_csv_path=None,
+    list_only=False,
+    ssh_service=None,
 ):
     """
     Connect directly or via Indirect Bridge (172.21.168.241 -> 172.19.*.*) to a remote test station,
     search for logs matching raw_sn (supports multiple comma-separated SNs), perform Selective Fast Fetch
     into a temporary directory, extract reports into <App_Dir>/reports/<Target_SN>/, and clean up.
+    Supports reusing an existing ssh_service and --list-only mode.
     """
     from pathlib import Path
     from module import config as m_config
     from module.bridge import build_bridge_settings, should_use_bridge
-    from module.ip_utils import expand_ip
+    from module.ip_utils import expand_ip, get_station_line_info
     from module.log_finder import (
         filter_entries,
-        format_entries_table,
+        format_entries_table_colored,
         parse_selection,
         parse_sn_list,
     )
     from module.remote_fetcher import SshLogService
+    from module.smart_actions import RecentHistoryManager, export_retry_csv
 
     host = expand_ip(raw_ip, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+    station_info = get_station_line_info(host, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+    station_tag = f" [{station_info['line']} • .{station_info['octet']}]" if station_info else ""
     sn_list = parse_sn_list(raw_sn)
     if not sn_list:
         raise ValueError("Danh sách Serial Number (SN) trống.")
@@ -2330,12 +2344,13 @@ def process_remote_extraction(
     )
 
     print(f"\n{Color.BRIGHT_CYAN}🌐 [KẾT NỐI TRẠM TEST TỪ XA]{Color.RESET}")
-    print(f"   ├─ {Color.GRAY}Máy đích (Target IP) :{Color.RESET} {Color.BOLD}{Color.WHITE}{host}:{port}{Color.RESET} (nhập: {raw_ip})")
+    print(f"   ├─ {Color.GRAY}Máy đích (Target IP) :{Color.RESET} {Color.BOLD}{Color.WHITE}{host}:{port}{Color.RESET}{Color.BRIGHT_GREEN}{station_tag}{Color.RESET} (nhập: {raw_ip})")
     print(f"   ├─ {Color.GRAY}Phương thức kết nối  :{Color.RESET} {Color.BRIGHT_YELLOW}{route_desc}{Color.RESET}")
     print(f"   ├─ {Color.GRAY}Serial Number cần tìm:{Color.RESET} {Color.BOLD}{Color.CYAN}{', '.join(sn_list)}{Color.RESET}")
     print(f"   └─ {Color.GRAY}Thư mục lưu báo cáo  :{Color.RESET} {Color.WHITE}{output_base}{Color.RESET}")
 
-    service = SshLogService(
+    owns_service = ssh_service is None
+    service = ssh_service or SshLogService(
         host=host,
         username=ssh_user,
         password=ssh_password,
@@ -2347,12 +2362,18 @@ def process_remote_extraction(
 
     all_results = []
     try:
-        print(f"\n   {Color.YELLOW}⏳ Đang thiết lập phiên SSH tới {host}...{Color.RESET}")
-        service.connect()
-        print(
-            f"   {Color.BRIGHT_GREEN}✔ Đã kết nối thành công!{Color.RESET} "
-            f"(OS: {Color.BOLD}{service.remote_os.upper()}{Color.RESET} │ User: {Color.CYAN}{service.username}{Color.RESET})"
-        )
+        if owns_service or not getattr(service, "is_connected", False):
+            print(f"\n   {Color.YELLOW}⏳ Đang thiết lập phiên SSH tới {host}...{Color.RESET}")
+            service.connect()
+            print(
+                f"   {Color.BRIGHT_GREEN}✔ Đã kết nối thành công!{Color.RESET} "
+                f"(OS: {Color.BOLD}{service.remote_os.upper()}{Color.RESET} │ User: {Color.CYAN}{service.username}{Color.RESET})"
+            )
+        else:
+            print(
+                f"\n   {Color.BRIGHT_GREEN}⚡ Tái sử dụng phiên SSH đang mở tới {host}!{Color.RESET} "
+                f"(OS: {Color.BOLD}{service.remote_os.upper()}{Color.RESET} │ User: {Color.CYAN}{service.username}{Color.RESET})"
+            )
 
         for sn_idx, sn_query in enumerate(sn_list, 1):
             print(f"\n{Color.BRIGHT_CYAN}🔎 [{sn_idx}/{len(sn_list)}] Đang tìm log cho SN '{sn_query}' trên {host}...{Color.RESET}")
@@ -2364,6 +2385,8 @@ def process_remote_extraction(
                 print(f"   {Color.RED}✖ {msg}{Color.RESET}")
                 all_results.append({
                     "sn": sn_query,
+                    "source_target": host,
+                    "output_base": output_base,
                     "unit_type": "-",
                     "controller": "-",
                     "status": "FAIL",
@@ -2376,8 +2399,24 @@ def process_remote_extraction(
                 continue
 
             print(f"   {Color.GREEN}✔ Tìm thấy {len(filtered)} bộ log tại {found_in_path}:{Color.RESET}")
-            for line in format_entries_table(filtered).splitlines():
-                print(f"     {line}")
+            for line in format_entries_table_colored(filtered).splitlines():
+                print(f"   {line}")
+
+            if list_only:
+                all_results.append({
+                    "sn": sn_query,
+                    "source_target": host,
+                    "output_base": output_base,
+                    "unit_type": "LIST-ONLY",
+                    "controller": f"{len(filtered)} gói",
+                    "status": "SUCCESS",
+                    "error": "",
+                    "out_dir": found_in_path,
+                    "cycle_time": filtered[0].end_time_str,
+                    "metadata": {"test_result": filtered[0].test_result},
+                    "warnings": [],
+                })
+                continue
 
             if latest_n is not None or len(filtered) == 1 or not interactive or not sys.stdin.isatty():
                 selected_entries = filtered if latest_n is not None else [filtered[0]]
@@ -2385,12 +2424,15 @@ def process_remote_extraction(
                     print(f"   {Color.BRIGHT_YELLOW}⚡ Tự động chọn bộ log mới nhất: {selected_entries[0].name}{Color.RESET}")
             else:
                 sel_prompt = (
-                    f"\n   {Color.CYAN}👉 Chọn STT log cần phân tích (VD: 1, 1-2, l=mới nhất, a=tất cả; Enter = [1] mới nhất): {Color.RESET}"
+                    f"\n   {Color.CYAN}👉 Chọn STT cần trích xuất (VD: 1, 1-3), 'P' (chỉ PASS), 'F' (chỉ FAIL), "
+                    f"'L' (mới nhất), 'A' (tất cả); Enter = [1] mới nhất: {Color.RESET}"
                 )
-                raw_sel = safe_input(sel_prompt, default="1") or "1"
-                selected_entries = parse_selection(raw_sel, filtered)
-                if not selected_entries:
-                    selected_entries = [filtered[0]]
+                while True:
+                    raw_sel = safe_input(sel_prompt, default="1") or "1"
+                    selected_entries = parse_selection(raw_sel, filtered)
+                    if selected_entries:
+                        break
+                    print(f"   {Color.YELLOW}⚠ Không có gói log nào khớp lựa chọn '{raw_sel.strip()}'. Vui lòng chọn lại.{Color.RESET}")
 
             keep_dir = (Path(get_default_downloads_dir()) / host) if keep_raw_zip else None
 
@@ -2440,11 +2482,15 @@ def process_remote_extraction(
                                 quiet=False,
                                 diagnose=diagnose,
                             )
+                            res["source_target"] = host
+                            res["output_base"] = output_base
                             all_results.append(res)
                         except Exception as exc:
                             print(f"   {Color.RED}✖ Lỗi khi trích xuất '{entry.name}' (SN {t_sn}): {exc}{Color.RESET}")
                             all_results.append({
                                 "sn": t_sn,
+                                "source_target": host,
+                                "output_base": output_base,
                                 "unit_type": "-",
                                 "controller": "-",
                                 "status": "FAIL",
@@ -2457,12 +2503,25 @@ def process_remote_extraction(
                 finally:
                     shutil.rmtree(to_long_path(tmp_dir), ignore_errors=True)
     finally:
-        service.disconnect()
+        if owns_service:
+            service.disconnect()
 
-    if export_csv and all_results:
+    if not list_only:
+        try:
+            max_hist = int(m_config.LOCAL_SETTINGS.get("ui", {}).get("max_recent_history", 5))
+            hist_mgr = RecentHistoryManager(m_config.HISTORY_FILE, max_items=max_hist)
+            first_valid_out = next((r.get("out_dir") for r in all_results if r.get("out_dir") and r.get("out_dir") != "-"), output_base)
+            hist_mgr.record_session([host], sn_list, last_target_path=first_valid_out)
+        except Exception:
+            pass
+
+    if export_csv and all_results and not list_only:
         print_batch_summary_table(all_results)
         csv_target = custom_csv_path if custom_csv_path else os.path.join(output_base, "Cycle_Time_Summary.csv")
         export_cycle_time_summary_csv(all_results, csv_target)
+        retry_path = export_retry_csv(all_results, output_base)
+        if retry_path:
+            print(f"   {Color.YELLOW}📋 Đã xuất danh sách lỗi để chạy lại tại: {from_long_path(str(retry_path))}{Color.RESET}")
 
     return all_results
 
@@ -2470,7 +2529,14 @@ def process_remote_extraction(
 def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=False):
     """
     Run extraction over a list of batch items (supports both Remote IP+SN items and Local Folder/Archive items).
+    Includes per-host SSH session reuse + Fail-Fast for unreachable remote hosts + retry_failed.csv export.
     """
+    from module import config as m_config
+    from module.bridge import build_bridge_settings
+    from module.ip_utils import expand_ip
+    from module.remote_fetcher import SshLogService
+    from module.smart_actions import export_retry_csv
+
     total = len(batch_items)
     if total == 0:
         print(f"\n{Color.YELLOW}⚠ Danh sách trích xuất trống.{Color.RESET}")
@@ -2482,6 +2548,16 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
     print(f"{Color.GRAY}─────────────────────────────────────────────────────────────────────────────{Color.RESET}")
 
     indexed_results = [None] * total
+    host_locks = {}
+    host_services = {}
+    failed_hosts = {}
+    host_cache_lock = threading.Lock()
+
+    def _get_host_lock(host_ip):
+        with host_cache_lock:
+            if host_ip not in host_locks:
+                host_locks[host_ip] = threading.Lock()
+            return host_locks[host_ip]
 
     def _worker_task(idx, item):
         log_path, target_sn, output_base = item
@@ -2494,6 +2570,8 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
                     print(f"\n{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Thiếu Serial Number cho trạm test IP: {log_path}{Color.RESET}")
                 return idx, {
                     "sn": "N/A",
+                    "source_target": log_path,
+                    "output_base": output_base,
                     "unit_type": "-",
                     "controller": "-",
                     "status": "FAIL",
@@ -2504,40 +2582,114 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
                     "warnings": []
                 }
             try:
-                rem_results = process_remote_extraction(
-                    raw_ip=log_path,
-                    raw_sn=target_sn,
-                    output_base_raw=output_base,
-                    latest_n=1,
-                    diagnose=diagnose,
-                    interactive=False,
-                    export_csv=False,
-                )
-                return idx, (rem_results[0] if rem_results else {
-                    "sn": target_sn,
-                    "unit_type": "-",
-                    "controller": "-",
-                    "status": "FAIL",
-                    "error": "No result returned",
-                    "out_dir": "-",
-                    "cycle_time": "N/A",
-                    "metadata": {},
-                    "warnings": []
-                })
-            except Exception as e:
-                with _PRINT_LOCK:
-                    print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Lỗi kết nối/trích xuất từ xa ({log_path} - {target_sn}): {e}{Color.RESET}")
+                host_ip = expand_ip(log_path, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+            except Exception as exc:
                 return idx, {
                     "sn": target_sn,
+                    "source_target": log_path,
+                    "output_base": output_base,
                     "unit_type": "-",
                     "controller": "-",
                     "status": "FAIL",
-                    "error": str(e),
+                    "error": str(exc),
                     "out_dir": "-",
                     "cycle_time": "N/A",
                     "metadata": {},
                     "warnings": []
                 }
+
+            h_lock = _get_host_lock(host_ip)
+            with h_lock:
+                if host_ip in failed_hosts:
+                    err_msg = f"Fail-Fast (máy {host_ip} không phản hồi): {failed_hosts[host_ip]}"
+                    with _PRINT_LOCK:
+                        print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}⚡ Bỏ qua nhanh ({host_ip} - {target_sn}): {err_msg}{Color.RESET}")
+                    return idx, {
+                        "sn": target_sn,
+                        "source_target": host_ip,
+                        "output_base": output_base,
+                        "unit_type": "-",
+                        "controller": "-",
+                        "status": "FAIL",
+                        "error": err_msg,
+                        "out_dir": "-",
+                        "cycle_time": "N/A",
+                        "metadata": {},
+                        "warnings": []
+                    }
+
+                svc = host_services.get(host_ip)
+                if svc is None or not getattr(svc, "is_connected", False):
+                    bridge_settings = build_bridge_settings()
+                    svc = SshLogService(
+                        host=host_ip,
+                        port=m_config.DEFAULT_SSH_PORT,
+                        timeout=m_config.SSH_CONNECT_TIMEOUT_SEC,
+                        bridge_settings=bridge_settings,
+                        show_progress=False,
+                    )
+                    try:
+                        svc.connect()
+                        host_services[host_ip] = svc
+                    except Exception as conn_exc:
+                        failed_hosts[host_ip] = str(conn_exc)
+                        with _PRINT_LOCK:
+                            print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Không thể kết nối máy {host_ip} ({target_sn}): {conn_exc}{Color.RESET}")
+                        return idx, {
+                            "sn": target_sn,
+                            "source_target": host_ip,
+                            "output_base": output_base,
+                            "unit_type": "-",
+                            "controller": "-",
+                            "status": "FAIL",
+                            "error": str(conn_exc),
+                            "out_dir": "-",
+                            "cycle_time": "N/A",
+                            "metadata": {},
+                            "warnings": []
+                        }
+
+                try:
+                    rem_results = process_remote_extraction(
+                        raw_ip=host_ip,
+                        raw_sn=target_sn,
+                        output_base_raw=output_base,
+                        latest_n=1,
+                        diagnose=diagnose,
+                        interactive=False,
+                        export_csv=False,
+                        ssh_service=svc,
+                    )
+                    res_item = rem_results[0] if rem_results else {
+                        "sn": target_sn,
+                        "source_target": host_ip,
+                        "output_base": output_base,
+                        "unit_type": "-",
+                        "controller": "-",
+                        "status": "FAIL",
+                        "error": "No result returned",
+                        "out_dir": "-",
+                        "cycle_time": "N/A",
+                        "metadata": {},
+                        "warnings": []
+                    }
+                    return idx, res_item
+                except Exception as e:
+                    with _PRINT_LOCK:
+                        print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Lỗi kết nối/trích xuất từ xa ({host_ip} - {target_sn}): {e}{Color.RESET}")
+                    return idx, {
+                        "sn": target_sn,
+                        "source_target": host_ip,
+                        "output_base": output_base,
+                        "unit_type": "-",
+                        "controller": "-",
+                        "status": "FAIL",
+                        "error": str(e),
+                        "out_dir": "-",
+                        "cycle_time": "N/A",
+                        "metadata": {},
+                        "warnings": []
+                    }
 
         if not target_sn:
             sns = detect_sns_from_folder(log_path)
@@ -2548,6 +2700,8 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
                 print(f"\n{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Không thể nhận diện Target SN cho: {log_path}{Color.RESET}")
             return idx, {
                 "sn": "N/A",
+                "source_target": log_path,
+                "output_base": output_base,
                 "unit_type": "-",
                 "controller": "-",
                 "status": "FAIL",
@@ -2561,6 +2715,8 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
         try:
             use_quiet = effective_workers > 1
             res = process_single_extraction(log_path, target_sn, output_base, quiet=use_quiet, diagnose=diagnose)
+            res["source_target"] = log_path
+            res["output_base"] = output_base
             with _PRINT_LOCK:
                 print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.BRIGHT_GREEN}✔ Hoàn tất SN {res['sn']}{Color.RESET} ({res['unit_type']} - {res['controller']}) │ Cycle Time: {Color.BRIGHT_CYAN}{res.get('cycle_time', 'N/A')}{Color.RESET} ➜ {Color.GRAY}{res['out_dir']}{Color.RESET}")
                 for w in res.get("warnings", []):
@@ -2571,6 +2727,8 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
                 print(f"{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} {Color.RED}✖ Lỗi khi trích xuất SN {target_sn}: {e}{Color.RESET}")
             return idx, {
                 "sn": target_sn,
+                "source_target": log_path,
+                "output_base": output_base,
                 "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis 5U" if ("W47DG" in log_path or "5U_Dell" in log_path or "5U84" in log_path) else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else "IO"))),
                 "controller": "-",
                 "status": "FAIL",
@@ -2581,35 +2739,42 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
                 "warnings": []
             }
 
-    if effective_workers == 1:
-        for idx, item in enumerate(batch_items, 1):
-            print(f"\n{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} Đang xử lý: {Color.GRAY}{item[0]}{Color.RESET}")
-            _, res = _worker_task(idx, item)
-            indexed_results[idx - 1] = res
-    else:
-        work_q = queue.Queue()
-        for idx, item in enumerate(batch_items, 1):
-            work_q.put((idx, item))
+    try:
+        if effective_workers == 1:
+            for idx, item in enumerate(batch_items, 1):
+                print(f"\n{Color.BRIGHT_CYAN}[{idx}/{total}]{Color.RESET} Đang xử lý: {Color.GRAY}{item[0]}{Color.RESET}")
+                _, res = _worker_task(idx, item)
+                indexed_results[idx - 1] = res
+        else:
+            work_q = queue.Queue()
+            for idx, item in enumerate(batch_items, 1):
+                work_q.put((idx, item))
 
-        def _thread_runner():
-            while True:
-                try:
-                    idx, item = work_q.get_nowait()
-                except queue.Empty:
-                    break
-                try:
-                    r_idx, res = _worker_task(idx, item)
-                    indexed_results[r_idx - 1] = res
-                finally:
-                    work_q.task_done()
+            def _thread_runner():
+                while True:
+                    try:
+                        idx, item = work_q.get_nowait()
+                    except queue.Empty:
+                        break
+                    try:
+                        r_idx, res = _worker_task(idx, item)
+                        indexed_results[r_idx - 1] = res
+                    finally:
+                        work_q.task_done()
 
-        threads = []
-        for _ in range(effective_workers):
-            t = threading.Thread(target=_thread_runner, daemon=True)
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
+            threads = []
+            for _ in range(effective_workers):
+                t = threading.Thread(target=_thread_runner, daemon=True)
+                t.start()
+                threads.append(t)
+            for t in threads:
+                t.join()
+    finally:
+        for svc in host_services.values():
+            try:
+                svc.disconnect()
+            except Exception:
+                pass
 
     results = [r for r in indexed_results if r is not None]
     print_batch_summary_table(results)
@@ -2621,6 +2786,9 @@ def run_batch_extraction(batch_items, max_workers=4, export_csv=True, diagnose=F
         else:
             csv_dir = get_default_reports_dir()
         export_cycle_time_summary_csv(results, os.path.join(csv_dir, "Cycle_Time_Summary.csv"))
+        retry_path = export_retry_csv(results, csv_dir)
+        if retry_path:
+            print(f"   {Color.YELLOW}📋 Đã xuất danh sách lỗi để chạy lại tại: {from_long_path(str(retry_path))}{Color.RESET}")
 
     return results
 
@@ -2670,6 +2838,95 @@ def open_native_path_dialog(mode="folder", title="Chọn đường dẫn"):
         return selected
     except Exception:
         return ""
+
+
+def get_clipboard_text():
+    """
+    Read plain Unicode text from the Windows Clipboard (fast ctypes Win32 API with PowerShell fallback).
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            CF_UNICODETEXT = 13
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+            user32.OpenClipboard.restype = ctypes.c_int
+            user32.GetClipboardData.argtypes = [ctypes.c_uint]
+            user32.GetClipboardData.restype = ctypes.c_void_p
+            user32.CloseClipboard.argtypes = []
+            user32.CloseClipboard.restype = ctypes.c_int
+            kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+            kernel32.GlobalLock.restype = ctypes.c_void_p
+            kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            kernel32.GlobalUnlock.restype = ctypes.c_int
+
+            if user32.OpenClipboard(None):
+                try:
+                    handle = user32.GetClipboardData(CF_UNICODETEXT)
+                    if handle:
+                        ptr = kernel32.GlobalLock(handle)
+                        if ptr:
+                            try:
+                                text = ctypes.wstring_at(ptr)
+                                if text:
+                                    return text.strip()
+                            finally:
+                                kernel32.GlobalUnlock(handle)
+                finally:
+                    user32.CloseClipboard()
+        except Exception:
+            pass
+
+        try:
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                timeout=3,
+            )
+            return proc.stdout.strip()
+        except Exception:
+            pass
+    return ""
+
+
+def get_sn_from_clipboard(allow_multiple=True):
+    """
+    Extract valid Serial Number(s) from the system clipboard.
+    Prioritizes standard MFG SN patterns (SAF..., SGF..., FVB..., PM...),
+    with fallback to clean alphanumeric SN tokens.
+    """
+    raw_clip = get_clipboard_text()
+    if not raw_clip:
+        return ""
+
+    # 1. Check for known MFG Serial Number patterns first
+    pattern = r'(SAF[A-Z0-9]{8,}|SGF[A-Z0-9]{8,}|FVB[A-Z0-9]{6,}|PM[A-Z0-9]{10,})'
+    matches = re.findall(pattern, raw_clip.upper())
+    if matches:
+        unique_sns = []
+        for m in matches:
+            if m not in unique_sns:
+                unique_sns.append(m)
+        return ", ".join(unique_sns) if allow_multiple else unique_sns[0]
+
+    # 2. Fallback: accept clean alphanumeric token(s) if clipboard doesn't look like a file path or long text
+    cleaned = raw_clip.strip(' "\' \t\r\n')
+    if not cleaned or len(cleaned) > 120 or any(ch in cleaned for ch in ("\\", "/", ":")):
+        return ""
+    tokens = [t.strip() for t in re.split(r'[,;\s]+', cleaned) if t.strip()]
+    if tokens and all(re.match(r'^[A-Za-z0-9_-]{4,32}$', t) for t in tokens):
+        unique_tokens = []
+        for t in tokens:
+            t_up = t.upper()
+            if t_up not in unique_tokens:
+                unique_tokens.append(t_up)
+        return ", ".join(unique_tokens) if allow_multiple else unique_tokens[0]
+
+    return ""
 
 
 def safe_input(prompt_text="", default=""):
@@ -2761,115 +3018,470 @@ def prompt_post_extraction_actions(last_out_dir=None):
     """
     Interactive post-action bar:
       [O] Open output folder in Windows Explorer
+      [C] Copy output path to Clipboard
       [R] Return to main menu
       [Q/Enter] Exit
     Returns True if user wants to return to main menu, False otherwise.
     """
+    if last_out_dir == "__RETURN_MENU__":
+        return True
+    if last_out_dir == "__QUIT__":
+        return False
     if not sys.stdin.isatty():
         return False
+
+    from module.smart_actions import open_output_target, set_clipboard_text
+
     print(f"{Color.GRAY}─────────────────────────────────────────────────────────────────────────────{Color.RESET}")
     if last_out_dir and last_out_dir != "-" and os.path.exists(to_long_path(last_out_dir)):
-        prompt_str = (
-            f"   {Color.CYAN}[O]{Color.RESET} Mở thư mục kết quả (Explorer)  │  "
-            f"{Color.CYAN}[R]{Color.RESET} Về Menu chính  │  "
-            f"{Color.CYAN}[Enter/Q]{Color.RESET} Thoát: "
-        )
-        choice = get_single_key_choice(prompt_str, ["O", "R", "Q"], default_key="Q")
-        if choice == "O":
-            try:
-                target_open = last_out_dir if os.path.isdir(to_long_path(last_out_dir)) else os.path.dirname(last_out_dir)
-                os.startfile(from_long_path(target_open))
-                print(f"   {Color.GREEN}📂 Đã mở Windows Explorer: {from_long_path(target_open)}{Color.RESET}")
-            except Exception as e:
-                print(f"   {Color.YELLOW}⚠ Không thể mở Explorer: {e}{Color.RESET}")
-            # After opening Explorer, ask if user wants to return to menu or quit
-            prompt_str2 = f"   {Color.CYAN}[R]{Color.RESET} Về Menu chính  │  {Color.CYAN}[Enter/Q]{Color.RESET} Thoát: "
-            choice2 = get_single_key_choice(prompt_str2, ["R", "Q"], default_key="Q")
-            return choice2 == "R"
-        return choice == "R"
+        while True:
+            prompt_str = (
+                f"   {Color.CYAN}[O]{Color.RESET} 📂 Mở thư mục kết quả  │  "
+                f"{Color.CYAN}[C]{Color.RESET} 📋 Copy đường dẫn  │  "
+                f"{Color.CYAN}[R]{Color.RESET} 🏠 Về Menu chính  │  "
+                f"{Color.CYAN}[Enter/Q]{Color.RESET} Thoát: "
+            )
+            choice = get_single_key_choice(prompt_str, ["O", "C", "R", "Q"], default_key="Q")
+            if choice == "O":
+                if open_output_target(last_out_dir, select_file=False):
+                    print(f"   {Color.GREEN}📂 Đã mở Windows Explorer: {from_long_path(last_out_dir)}{Color.RESET}")
+                else:
+                    print(f"   {Color.YELLOW}⚠ Không thể mở Explorer cho: {from_long_path(last_out_dir)}{Color.RESET}")
+                continue
+            if choice == "C":
+                clean_p = from_long_path(last_out_dir)
+                if set_clipboard_text(clean_p):
+                    print(f"   {Color.GREEN}📋 Đã copy đường dẫn vào Clipboard: {clean_p}{Color.RESET}")
+                else:
+                    print(f"   {Color.YELLOW}⚠ Không thể ghi Clipboard.{Color.RESET}")
+                continue
+            return choice == "R"
     else:
-        prompt_str = f"   {Color.CYAN}[R]{Color.RESET} Về Menu chính  │  {Color.CYAN}[Enter/Q]{Color.RESET} Thoát: "
+        prompt_str = f"   {Color.CYAN}[R]{Color.RESET} 🏠 Về Menu chính  │  {Color.CYAN}[Enter/Q]{Color.RESET} Thoát: "
         choice = get_single_key_choice(prompt_str, ["R", "Q"], default_key="Q")
         return choice == "R"
+
+
+def _format_station_cell(oct4, style, is_selected=False):
+    """
+    Format a single 8-character station cell (e.g. '[ .188 ]' or highlighted '[>.174<]').
+    Uses pure ASCII width (8 visible chars) so all 3 Line boxes align 100% across fonts.
+    """
+    style_colors = {
+        "pink": "\033[95m",     # Bright Magenta / Pink
+        "green": "\033[92m",    # Bright Green / Teal
+        "blue": "\033[96m",     # Bright Cyan / Blue
+        "amber": "\033[93m",    # Bright Yellow / Amber
+        "dim": "\033[90m",      # Dark Gray (inactive)
+    }
+    fg = style_colors.get(style, Color.WHITE)
+    if is_selected:
+        return f"\033[7m\033[1m{Color.BRIGHT_CYAN}[>.{oct4:03d}<]{Color.RESET}"
+    return f"{fg}[ .{oct4:03d} ]{Color.RESET}"
+
+
+def render_station_ip_map_lines(highlight_octet=None):
+    """
+    Build the 14-line visual 3-Column Station IP Diagram (Line 3 | Line 2 | Line 1)
+    matching the factory layout (172.19.116.121 .. 172.19.116.199).
+    """
+    from module.ip_utils import STATION_LINES
+
+    top_border = (
+        f"   {Color.GRAY}╭─────────────────────╮  ╭─────────────────────╮  ╭─────────────────────╮{Color.RESET}"
+    )
+    hdr_parts = []
+    for line_info in STATION_LINES:
+        name = line_info["name"]
+        summary = line_info["active_Summary"]
+        hdr_parts.append(
+            f"{Color.GRAY}│{Color.RESET}  {Color.BOLD}{Color.BRIGHT_CYAN}{name:<6}{Color.RESET}       "
+            f"{Color.BRIGHT_GREEN}{summary:>5}{Color.RESET} {Color.GRAY}│{Color.RESET}"
+        )
+    header_line = "   " + "  ".join(hdr_parts)
+    mid_border = (
+        f"   {Color.GRAY}├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤{Color.RESET}"
+    )
+
+    lines = [top_border, header_line, mid_border]
+    num_rows = len(STATION_LINES[0]["rows"])
+    for r_idx in range(num_rows):
+        row_cells = []
+        for l_idx in range(len(STATION_LINES)):
+            (oct_left, style_left), (oct_right, style_right) = STATION_LINES[l_idx]["rows"][r_idx]
+            c_left = _format_station_cell(oct_left, style_left, is_selected=(highlight_octet == oct_left))
+            c_right = _format_station_cell(oct_right, style_right, is_selected=(highlight_octet == oct_right))
+            row_cells.append(f"{Color.GRAY}│{Color.RESET}  {c_left} {c_right}  {Color.GRAY}│{Color.RESET}")
+        lines.append("   " + "  ".join(row_cells))
+
+    bot_border = (
+        f"   {Color.GRAY}╰─────────────────────╯  ╰─────────────────────╯  ╰─────────────────────╯{Color.RESET}"
+    )
+    lines.append(bot_border)
+    return lines
+
+
+def prompt_ip_with_station_map(ip_prefix="172.19", bridge_host="172.21.168.241"):
+    """
+    Interactive IP selector combining:
+      1. Visual 3-Column Station IP Diagram (Line 3 | Line 2 | Line 1) with arrow-key (↑↓←→) navigation + Enter.
+      2. Automatic Clipboard IP detection (auto-positions cursor on the map or pre-fills manual IP) + Recent IP history.
+      3. Instant manual typing (type '.174', '174', '116.174', '172.19.116.174', etc. at any time + Enter).
+      4. Graceful fallback for non-TTY / piped stdin.
+    """
+    from module import config as m_config
+    from module.ip_utils import STATION_LINES, DEFAULT_STATION_OCTET3, expand_ip, get_station_line_info
+    from module.smart_actions import RecentHistoryManager, detect_clipboard_ip
+
+    # Build 10x6 grid of octets across Line 3 (cols 0-1), Line 2 (cols 2-3), Line 1 (cols 4-5)
+    grid_rows = len(STATION_LINES[0]["rows"])
+    grid_cols = len(STATION_LINES) * 2
+    grid_octets = []
+    for r in range(grid_rows):
+        row_list = []
+        for l_idx in range(len(STATION_LINES)):
+            row_list.append(STATION_LINES[l_idx]["rows"][r][0][0])
+            row_list.append(STATION_LINES[l_idx]["rows"][r][1][0])
+        grid_octets.append(row_list)
+
+    recent_ips = []
+    try:
+        max_hist = int(m_config.LOCAL_SETTINGS.get("ui", {}).get("max_recent_history", 5))
+        recent_ips = RecentHistoryManager(m_config.HISTORY_FILE, max_items=max_hist).get_recent_ips()
+    except Exception:
+        recent_ips = []
+
+    clip_ip = None
+    if m_config.LOCAL_SETTINGS.get("ui", {}).get("enable_clipboard_hint", True):
+        clip_ip = detect_clipboard_ip(get_clipboard_text(), default_prefix=ip_prefix)
+
+    print(
+        f"{Color.BRIGHT_YELLOW}📌 [1/3] Chọn IP trên Sơ đồ ({Color.WHITE}↑↓←→{Color.BRIGHT_YELLOW} + {Color.WHITE}Enter{Color.BRIGHT_YELLOW}) "
+        f"hoặc Nhập thủ công ({Color.WHITE}.174{Color.BRIGHT_YELLOW}, {Color.WHITE}174{Color.BRIGHT_YELLOW}, {Color.WHITE}116.174{Color.BRIGHT_YELLOW}, {Color.WHITE}{ip_prefix}.116.174{Color.BRIGHT_YELLOW}):{Color.RESET}"
+    )
+    if recent_ips:
+        print(f"   {Color.GRAY}🕒 IP gần đây: {', '.join(recent_ips)}{Color.RESET}")
+    if clip_ip:
+        st_clip = get_station_line_info(clip_ip, ip_prefix=ip_prefix)
+        clip_badge = f" ({st_clip['line']} • .{st_clip['octet']})" if st_clip else ""
+        print(f"   {Color.BRIGHT_GREEN}📋 Phát hiện IP trong Clipboard: {Color.BOLD}{Color.WHITE}{clip_ip}{Color.RESET}{Color.BRIGHT_GREEN}{clip_badge} (Nhấn Enter để chọn ngay){Color.RESET}")
+
+    if not (sys.platform == "win32" and sys.stdin.isatty()):
+        for l_str in render_station_ip_map_lines(highlight_octet=None):
+            print(l_str)
+        raw_val = safe_input(f"   {Color.CYAN}👉 Nhập IP máy test: {Color.RESET}")
+        return raw_val if raw_val else (clip_ip or "")
+
+    import msvcrt
+
+    # Default highlight position: Clipboard station -> most recent station -> .174 (Line 3, row 5, col 0)
+    cur_r, cur_c = 5, 0
+    manual_buf = ""
+    if clip_ip:
+        st_clip = get_station_line_info(clip_ip, ip_prefix=ip_prefix)
+        if st_clip:
+            cur_r, cur_c = st_clip["row_idx"], st_clip["grid_col"]
+        else:
+            manual_buf = clip_ip
+    elif recent_ips:
+        st_rec = get_station_line_info(recent_ips[0], ip_prefix=ip_prefix)
+        if st_rec:
+            cur_r, cur_c = st_rec["row_idx"], st_rec["grid_col"]
+
+    def _resolve_highlighted_octet():
+        if manual_buf.strip():
+            info = get_station_line_info(manual_buf.strip(), ip_prefix=ip_prefix)
+            if info:
+                return info["octet"]
+            return None
+        return grid_octets[cur_r][cur_c]
+
+    def _build_frame():
+        hl_oct = _resolve_highlighted_octet()
+        frame = render_station_ip_map_lines(highlight_octet=hl_oct)
+        if manual_buf:
+            preview_str = ""
+            try:
+                resolved = expand_ip(manual_buf, ip_prefix=ip_prefix)
+                st_info = get_station_line_info(resolved, ip_prefix=ip_prefix)
+                line_badge = f" ({st_info['line']})" if st_info else " (IP thủ công)"
+                preview_str = f" {Color.GRAY}➜ {Color.BRIGHT_GREEN}{resolved}{line_badge}{Color.RESET}"
+            except Exception:
+                preview_str = f" {Color.GRAY}(đang nhập...){Color.RESET}"
+            frame.append(
+                f"   {Color.GRAY}[Esc: Chọn lại trên sơ đồ │ Enter: Xác nhận]{Color.RESET}"
+            )
+            frame.append(
+                f"   {Color.CYAN}👉 Nhập IP thủ công:{Color.RESET} {Color.BOLD}{Color.WHITE}{manual_buf}{Color.RESET}{preview_str}"
+            )
+        else:
+            sel_oct = grid_octets[cur_r][cur_c]
+            sel_ip = f"{ip_prefix}.{DEFAULT_STATION_OCTET3}.{sel_oct}"
+            st_info = get_station_line_info(sel_ip, ip_prefix=ip_prefix)
+            line_name = st_info["line"] if st_info else "Line"
+            state_note = "" if (not st_info or st_info["active"]) else f" {Color.YELLOW}(ô xám trên sơ đồ){Color.RESET}"
+            frame.append(
+                f"   {Color.GRAY}[Mũi tên ↑↓←→: Di chuyển trên sơ đồ │ Gõ số/chữ: Nhập IP thủ công │ Enter: Chọn]{Color.RESET}"
+            )
+            frame.append(
+                f"   {Color.CYAN}👉 Đang chọn:{Color.RESET} {Color.BOLD}{Color.BRIGHT_GREEN}.{sel_oct}{Color.RESET} "
+                f"{Color.WHITE}({sel_ip} — {Color.BRIGHT_CYAN}{line_name}{Color.WHITE}){Color.RESET}{state_note}"
+            )
+        return frame
+
+    initial_frame = _build_frame()
+    total_frame_lines = len(initial_frame)
+    for line in initial_frame:
+        print(line)
+
+    def _redraw():
+        new_frame = _build_frame()
+        sys.stdout.write(f"\033[{total_frame_lines}A")
+        for line in new_frame:
+            sys.stdout.write(f"\r\033[2K{line}\n")
+        sys.stdout.flush()
+
+    while True:
+        ch = msvcrt.getwch()
+        if ch == "\x03":  # Ctrl+C
+            print()
+            raise KeyboardInterrupt
+        if ch in ("\x00", "\xe0"):
+            ext = msvcrt.getwch()
+            if ext == "H":  # Up
+                cur_r = (cur_r - 1) % grid_rows
+                manual_buf = ""
+                _redraw()
+            elif ext == "P":  # Down
+                cur_r = (cur_r + 1) % grid_rows
+                manual_buf = ""
+                _redraw()
+            elif ext == "K":  # Left
+                cur_c = (cur_c - 1) % grid_cols
+                manual_buf = ""
+                _redraw()
+            elif ext == "M":  # Right
+                cur_c = (cur_c + 1) % grid_cols
+                manual_buf = ""
+                _redraw()
+            continue
+
+        if ch in ("\r", "\n"):
+            if manual_buf.strip():
+                return manual_buf.strip()
+            sel_oct = grid_octets[cur_r][cur_c]
+            return f".{sel_oct}"
+
+        if ch == "\x1b":  # Esc clears manual buffer back to map selector
+            if manual_buf:
+                manual_buf = ""
+                _redraw()
+            continue
+
+        if ch == "\x08":  # Backspace
+            if manual_buf:
+                manual_buf = manual_buf[:-1]
+                info = get_station_line_info(manual_buf, ip_prefix=ip_prefix) if manual_buf else None
+                if info:
+                    cur_r, cur_c = info["row_idx"], info["grid_col"]
+                _redraw()
+            continue
+
+        if ch.isprintable():
+            manual_buf += ch
+            info = get_station_line_info(manual_buf, ip_prefix=ip_prefix)
+            if info:
+                cur_r, cur_c = info["row_idx"], info["grid_col"]
+            _redraw()
 
 
 def run_remote_interactive_mode():
     """
     Interactive Mode [1]: Connect to remote test station via IP + SN (Indirect Bridge 172.21.168.241 -> 172.19.*.*)
     and extract reports directly into <App_Dir>/reports/<Target_SN>/.
+    Supports continuous same-host loop (reusing active SSH session), switching IP, opening Explorer [O], and copying path [C].
     """
     from module import config as m_config
-    from module.ip_utils import expand_ip
+    from module.bridge import build_bridge_settings
+    from module.ip_utils import expand_ip, get_station_line_info
+    from module.remote_fetcher import SshLogService
+    from module.smart_actions import (
+        RecentHistoryManager,
+        open_output_target,
+        resolve_best_report_target,
+        set_clipboard_text,
+    )
 
     print(f"\n{Color.BRIGHT_YELLOW}📌 [Remote IP + SN Mode] Trích xuất trực tiếp từ Trạm Test (Bridge {m_config.LOCAL_SETTINGS['bridge']['host']} ➜ {m_config.DEFAULT_IP_PREFIX}.*.*):{Color.RESET}\n")
 
-    while True:
-        ip_prompt = (
-            f"{Color.BRIGHT_YELLOW}📌 [1/3] Nhập IP máy test (VD: 116.174, 116174, 172.19.116.174 hoặc {m_config.LOCAL_SETTINGS['bridge']['host']}):{Color.RESET}\n"
-            f"   {Color.CYAN}👉 {Color.RESET}"
-        )
-        raw_ip = safe_input(ip_prompt)
-        if not raw_ip:
-            if not sys.stdin.isatty():
-                return None
-            print(f"   {Color.RED}✖ IP không được để trống. Vui lòng nhập lại!{Color.RESET}\n")
-            continue
-        try:
-            full_ip = expand_ip(raw_ip, ip_prefix=m_config.DEFAULT_IP_PREFIX)
-            print(f"   {Color.GREEN}➜ Địa chỉ IP máy đích: {full_ip}{Color.RESET}")
-            break
-        except Exception as exc:
-            if not sys.stdin.isatty():
-                print(f"   {Color.RED}✖ {exc}{Color.RESET}")
-                return None
-            print(f"   {Color.RED}✖ {exc}. Vui lòng nhập lại!{Color.RESET}\n")
-
-    while True:
-        sn_prompt = (
-            f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Nhập Serial Number cần tìm (hỗ trợ nhiều SN cách nhau dấu phẩy, VD: SN1, SN2):{Color.RESET}\n"
-            f"   {Color.CYAN}👉 {Color.RESET}"
-        )
-        raw_sn = safe_input(sn_prompt)
-        if raw_sn:
-            break
-        if not sys.stdin.isatty():
-            return None
-        print(f"   {Color.RED}✖ Serial Number không được để trống. Vui lòng nhập lại!{Color.RESET}")
-
-    default_reports = get_default_reports_dir()
-    out_prompt = (
-        f"\n{Color.BRIGHT_YELLOW}📌 [3/3] Nhập thư mục lưu báo cáo (Mặc định: {default_reports}):{Color.RESET}\n"
-        f"   {Color.CYAN}👉 Nhấn Enter dùng mặc định, gõ [B] chọn thư mục, hoặc dán đường dẫn khác: {Color.RESET}"
-    )
-    output_dir_raw = prompt_path_with_browse(
-        out_prompt,
-        dialog_mode="folder",
-        dialog_title="Chọn thư mục lưu báo cáo đầu ra",
-        allow_file_shortcut=False,
-    )
-    if not output_dir_raw:
-        output_dir_raw = default_reports
-        print(f"   {Color.GREEN}➜ Đã chọn mặc định: {default_reports}{Color.RESET}")
+    active_service = None
+    active_host = None
+    output_dir_raw = None
 
     try:
-        results = process_remote_extraction(
-            raw_ip=raw_ip,
-            raw_sn=raw_sn,
-            output_base_raw=output_dir_raw,
-            interactive=True,
-            export_csv=True,
-        )
-        first_out = next((r.get("out_dir") for r in results if r.get("out_dir") and r.get("out_dir") != "-"), default_reports)
-        return first_out
-    except Exception as exc:
-        print(f"\n{Color.RED}✖ Lỗi khi trích xuất từ xa: {exc}{Color.RESET}\n")
-        return None
+        while True:
+            # Step 1: Select or reuse IP
+            if not active_host:
+                while True:
+                    raw_ip = prompt_ip_with_station_map(
+                        ip_prefix=m_config.DEFAULT_IP_PREFIX,
+                        bridge_host=m_config.LOCAL_SETTINGS["bridge"]["host"],
+                    )
+                    if not raw_ip:
+                        if not sys.stdin.isatty():
+                            return None
+                        print(f"   {Color.RED}✖ IP không được để trống. Vui lòng nhập lại!{Color.RESET}\n")
+                        continue
+                    try:
+                        full_ip = expand_ip(raw_ip, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+                        st_info = get_station_line_info(full_ip, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+                        line_tag = f" ({st_info['line']} • .{st_info['octet']})" if st_info else " (IP thủ công)"
+                        print(f"   {Color.GREEN}➜ Đã chốt IP máy đích: {Color.BOLD}{Color.WHITE}{full_ip}{Color.RESET}{Color.BRIGHT_CYAN}{line_tag}{Color.RESET}")
+                        active_host = full_ip
+                        break
+                    except Exception as exc:
+                        if not sys.stdin.isatty():
+                            print(f"   {Color.RED}✖ {exc}{Color.RESET}")
+                            return None
+                        print(f"   {Color.RED}✖ {exc}. Vui lòng nhập lại!{Color.RESET}\n")
+            else:
+                st_info = get_station_line_info(active_host, ip_prefix=m_config.DEFAULT_IP_PREFIX)
+                line_tag = f" ({st_info['line']} • .{st_info['octet']})" if st_info else ""
+                print(f"\n{Color.BRIGHT_GREEN}🔗 Đang giữ kết nối máy test: {Color.BOLD}{Color.WHITE}{active_host}{Color.RESET}{Color.BRIGHT_CYAN}{line_tag}{Color.RESET}")
+
+            # Step 2: Prompt SN (with Clipboard & Recent SN hints)
+            recent_sns = []
+            try:
+                max_hist = int(m_config.LOCAL_SETTINGS.get("ui", {}).get("max_recent_history", 5))
+                recent_sns = RecentHistoryManager(m_config.HISTORY_FILE, max_items=max_hist).get_recent_sns()
+            except Exception:
+                recent_sns = []
+
+            while True:
+                clip_preview = get_sn_from_clipboard(allow_multiple=True)
+                clip_hint = (
+                    f"Nhấn Enter để lấy từ Clipboard: {Color.BOLD}{Color.WHITE}{clip_preview}{Color.RESET}{Color.GRAY}"
+                    if clip_preview
+                    else "Nhấn Enter để tự động lấy SN từ Clipboard"
+                )
+                recent_sn_line = f"   {Color.GRAY}🕒 SN gần đây: {', '.join(recent_sns)}{Color.RESET}\n" if recent_sns else ""
+                sn_prompt = (
+                    f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Nhập Serial Number cần tìm (hỗ trợ nhiều SN cách nhau dấu phẩy, VD: SN1, SN2):{Color.RESET}\n"
+                    f"{recent_sn_line}"
+                    f"   {Color.GRAY}({clip_hint}){Color.RESET}\n"
+                    f"   {Color.CYAN}👉 {Color.RESET}"
+                )
+                raw_sn = safe_input(sn_prompt)
+                if not raw_sn:
+                    raw_sn = get_sn_from_clipboard(allow_multiple=True)
+                    if raw_sn:
+                        print(f"   {Color.GREEN}📋 Đã tự động lấy SN từ Clipboard: {Color.BOLD}{Color.WHITE}{raw_sn}{Color.RESET}")
+                if raw_sn:
+                    break
+                if not sys.stdin.isatty():
+                    return None
+                print(f"   {Color.RED}✖ Serial Number trống (Clipboard cũng không có SN hợp lệ). Vui lòng nhập hoặc copy SN!{Color.RESET}")
+
+            # Step 3: Output directory (ask once per session)
+            default_reports = get_default_reports_dir()
+            if not output_dir_raw:
+                out_prompt = (
+                    f"\n{Color.BRIGHT_YELLOW}📌 [3/3] Nhập thư mục lưu báo cáo (Mặc định: {default_reports}):{Color.RESET}\n"
+                    f"   {Color.CYAN}👉 Nhấn Enter dùng mặc định, gõ [B] chọn thư mục, hoặc dán đường dẫn khác: {Color.RESET}"
+                )
+                output_dir_raw = prompt_path_with_browse(
+                    out_prompt,
+                    dialog_mode="folder",
+                    dialog_title="Chọn thư mục lưu báo cáo đầu ra",
+                    allow_file_shortcut=False,
+                )
+                if not output_dir_raw:
+                    output_dir_raw = default_reports
+                    print(f"   {Color.GREEN}➜ Đã chọn mặc định: {default_reports}{Color.RESET}")
+
+            # Ensure active_service is connected for active_host
+            if active_service is None or active_service.host != active_host:
+                if active_service is not None:
+                    active_service.disconnect()
+                bridge_settings = build_bridge_settings()
+                active_service = SshLogService(
+                    host=active_host,
+                    port=m_config.DEFAULT_SSH_PORT,
+                    timeout=m_config.SSH_CONNECT_TIMEOUT_SEC,
+                    bridge_settings=bridge_settings,
+                    show_progress=not (not sys.stdout.isatty()),
+                )
+
+            results = []
+            try:
+                results = process_remote_extraction(
+                    raw_ip=active_host,
+                    raw_sn=raw_sn,
+                    output_base_raw=output_dir_raw,
+                    interactive=True,
+                    export_csv=True,
+                    ssh_service=active_service,
+                )
+            except Exception as exc:
+                print(f"\n{Color.RED}✖ Lỗi khi trích xuất từ xa: {exc}{Color.RESET}\n")
+                if active_service is not None:
+                    active_service.disconnect()
+                    active_service = None
+
+            best_target, select_file = resolve_best_report_target(results, output_dir_raw or default_reports)
+            target_str = from_long_path(str(best_target)) if best_target else from_long_path(output_dir_raw or default_reports)
+
+            if not sys.stdin.isatty():
+                return target_str
+
+            if m_config.LOCAL_SETTINGS.get("ui", {}).get("auto_open_single", False) and best_target:
+                open_output_target(best_target, select_file=select_file)
+
+            # Interactive loop menu after remote extraction
+            while True:
+                print(f"\n{Color.GRAY}─────────────────────────────────────────────────────────────────────────────{Color.RESET}")
+                print(f"   {Color.BRIGHT_YELLOW}⚡ Thao tác nhanh (Báo cáo: {Color.WHITE}{target_str}{Color.BRIGHT_YELLOW}):{Color.RESET}")
+                print(f"   {Color.CYAN}[O]{Color.RESET} 📂 Mở ngay thư mục báo cáo vừa trích xuất  │  {Color.CYAN}[C]{Color.RESET} 📋 Copy đường dẫn vào Clipboard")
+                print(f"   {Color.CYAN}[1]{Color.RESET} 🔎 Tìm & trích xuất tiếp SN khác trên cùng máy ({Color.BRIGHT_GREEN}{active_host}{Color.RESET})")
+                print(f"   {Color.CYAN}[2]{Color.RESET} 🌐 Đổi sang IP máy test khác               │  {Color.CYAN}[R]{Color.RESET} 🏠 Về Menu chính  │  {Color.CYAN}[Enter/Q]{Color.RESET} 🚪 Thoát")
+                act_prompt = f"   {Color.CYAN}👉 Chọn nhanh [O/C/1/2/R/Q] (Enter = Thoát): {Color.RESET}"
+                act = get_single_key_choice(act_prompt, ["O", "C", "1", "2", "R", "Q"], default_key="Q")
+
+                if act == "O":
+                    if open_output_target(target_str, select_file=False):
+                        print(f"   {Color.GREEN}📂 Đã mở Windows Explorer: {target_str}{Color.RESET}")
+                    else:
+                        print(f"   {Color.YELLOW}⚠ Không thể mở Explorer cho: {target_str}{Color.RESET}")
+                    continue
+                if act == "C":
+                    if set_clipboard_text(target_str):
+                        print(f"   {Color.GREEN}📋 Đã copy đường dẫn vào Clipboard: {target_str}{Color.RESET}")
+                    else:
+                        print(f"   {Color.YELLOW}⚠ Không thể ghi Clipboard.{Color.RESET}")
+                    continue
+                if act == "1":
+                    # Continue outer loop with same active_host and active_service
+                    break
+                if act == "2":
+                    if active_service is not None:
+                        active_service.disconnect()
+                        active_service = None
+                    active_host = None
+                    break
+                if act == "R":
+                    return "__RETURN_MENU__"
+                return "__QUIT__"
+    finally:
+        if active_service is not None:
+            active_service.disconnect()
 
 
 def run_interactive_menu_once():
     """
     Runs one cycle of the interactive CLI menu. Returns last output directory for post-action handling.
     """
+    from module.smart_actions import open_output_target
+
     print_header()
     print(f"{Color.BRIGHT_YELLOW}Vui lòng chọn chế độ làm việc:{Color.RESET}")
     print(f"   {Color.CYAN}[1]{Color.RESET} 🌐 Trích xuất trực tiếp từ Trạm Test qua IP + SN (Indirect Bridge 172.21.168.241 ➜ 172.19.*.*)")
@@ -2878,10 +3490,18 @@ def run_interactive_menu_once():
     print(f"   {Color.CYAN}[4]{Color.RESET} 📋 Đọc danh sách trích xuất từ file CSV / TXT (Hỗ trợ cả IP Trạm Test & Đường dẫn Local)")
     print(f"   {Color.CYAN}[5]{Color.RESET} 📝 Tạo file CSV mẫu (mau_danh_sach_log.csv)")
     print(f"   {Color.CYAN}[6]{Color.RESET} ⏱  Phân tích nhanh Cycle Time & Chẩn đoán lỗi (Cycle Time & Failure Analyzer)")
-    print(f"   {Color.CYAN}[7]{Color.RESET} 🔍 Đối chiếu kết quả với thư mục Golden Sample (Golden Sample Diff Verifier)\n")
+    print(f"   {Color.CYAN}[7]{Color.RESET} 🔍 Đối chiếu kết quả với thư mục Golden Sample (Golden Sample Diff Verifier)")
+    print(f"   {Color.CYAN}[O]{Color.RESET} 📂 Mở nhanh thư mục báo cáo ({from_long_path(get_default_reports_dir())})\n")
 
-    prompt_str = f"   {Color.CYAN}👉 Chọn nhanh số (1-7) hoặc nhấn Enter để chọn [1]: {Color.RESET}"
-    mode_choice = get_single_key_choice(prompt_str, ["1", "2", "3", "4", "5", "6", "7"], default_key="1")
+    prompt_str = f"   {Color.CYAN}👉 Chọn nhanh số (1-7, O) hoặc nhấn Enter để chọn [1]: {Color.RESET}"
+    mode_choice = get_single_key_choice(prompt_str, ["1", "2", "3", "4", "5", "6", "7", "O"], default_key="1")
+
+    if mode_choice == "O":
+        rep_dir = get_default_reports_dir()
+        os.makedirs(to_long_path(rep_dir), exist_ok=True)
+        if open_output_target(rep_dir, select_file=False):
+            print(f"\n   {Color.GREEN}📂 Đã mở thư mục báo cáo: {from_long_path(rep_dir)}{Color.RESET}")
+        return "__RETURN_MENU__"
 
     if mode_choice == "1":
         return run_remote_interactive_mode()
@@ -3023,6 +3643,8 @@ def run_interactive_menu_once():
                 print(f"\n{Color.BRIGHT_YELLOW}⚡ [TỰ ĐỘNG CHỌN SN {unit_tag.upper()}]:{Color.RESET} {Color.BOLD}{Color.WHITE}{sn_item}{Color.RESET}")
                 target_sn_raw = sn_item
             else:
+                clip_sn = get_sn_from_clipboard(allow_multiple=False)
+                default_choice = 1
                 print(f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Phát hiện Serial Number trong tên thư mục/file. Vui lòng chọn:{Color.RESET}")
                 for idx, sn in enumerate(detected_sns, 1):
                     if sn.startswith("PM"):
@@ -3031,27 +3653,45 @@ def run_interactive_menu_once():
                         ctrl_tag = f" ({'ctrla' if idx == 1 else 'ctrlb'})"
                     else:
                         ctrl_tag = ""
-                    print(f"   {Color.CYAN}[{idx}]{Color.RESET} {Color.BOLD}{Color.WHITE}{sn}{Color.RESET}{Color.GRAY}{ctrl_tag}{Color.RESET}")
+                    clip_badge = ""
+                    if clip_sn and clip_sn.upper() == sn.upper():
+                        default_choice = idx
+                        clip_badge = f" {Color.BRIGHT_GREEN}📋 [Khớp Clipboard]{Color.RESET}"
+                    print(f"   {Color.CYAN}[{idx}]{Color.RESET} {Color.BOLD}{Color.WHITE}{sn}{Color.RESET}{Color.GRAY}{ctrl_tag}{Color.RESET}{clip_badge}")
 
-                default_choice = 1
-                prompt_str = f"   {Color.CYAN}👉 Chọn nhanh số (1-{len(detected_sns)}) hoặc nhấn Enter để chọn [{default_choice}] ({detected_sns[0]}): {Color.RESET}"
+                default_sn = detected_sns[default_choice - 1]
+                prompt_str = f"   {Color.CYAN}👉 Chọn nhanh số (1-{len(detected_sns)}) hoặc nhấn Enter để chọn [{default_choice}] ({default_sn}): {Color.RESET}"
                 valid_keys = [str(i) for i in range(1, len(detected_sns) + 1)]
-                choice_str = get_single_key_choice(prompt_str, valid_keys, default_key="1")
+                choice_str = get_single_key_choice(prompt_str, valid_keys, default_key=str(default_choice))
 
                 if choice_str.isdigit() and 1 <= int(choice_str) <= len(detected_sns):
                     target_sn_raw = detected_sns[int(choice_str) - 1]
                 else:
-                    target_sn_raw = detected_sns[0]
+                    target_sn_raw = default_sn
         else:
             while True:
-                prompt_str = f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Nhập Target Serial Number (VD: SAFVN... hoặc SGFVN...):{Color.RESET}\n   {Color.CYAN}👉 {Color.RESET}"
+                clip_preview = get_sn_from_clipboard(allow_multiple=False)
+                clip_hint = (
+                    f"Nhấn Enter để lấy từ Clipboard: {Color.BOLD}{Color.WHITE}{clip_preview}{Color.RESET}{Color.GRAY}"
+                    if clip_preview
+                    else "Nhấn Enter để tự động lấy SN từ Clipboard"
+                )
+                prompt_str = (
+                    f"\n{Color.BRIGHT_YELLOW}📌 [2/3] Nhập Target Serial Number (VD: SAFVN... hoặc SGFVN...):{Color.RESET}\n"
+                    f"   {Color.GRAY}({clip_hint}){Color.RESET}\n"
+                    f"   {Color.CYAN}👉 {Color.RESET}"
+                )
                 target_sn_raw = safe_input(prompt_str)
+                if not target_sn_raw:
+                    target_sn_raw = get_sn_from_clipboard(allow_multiple=False)
+                    if target_sn_raw:
+                        print(f"   {Color.GREEN}📋 Đã tự động lấy SN từ Clipboard: {Color.BOLD}{Color.WHITE}{target_sn_raw}{Color.RESET}")
                 if target_sn_raw:
                     break
                 if not sys.stdin.isatty():
                     print(f"   {Color.RED}✖ Target SN không được để trống.{Color.RESET}")
                     return None
-                print(f"   {Color.RED}✖ Target SN không được để trống. Vui lòng nhập lại!{Color.RESET}\n")
+                print(f"   {Color.RED}✖ Target SN trống (Clipboard cũng không có SN hợp lệ). Vui lòng nhập lại!{Color.RESET}\n")
 
         target_sn = target_sn_raw.strip(' "\' \t\r\n')
         default_output_base = get_default_reports_dir()
@@ -3095,6 +3735,7 @@ def main():
     parser.add_argument("--bridge-password", required=False, default=None, help="Override bridge password.")
     parser.add_argument("--bridge-transport", choices=["auto", "ssh", "winrm"], required=False, default=None, help="Bridge transport protocol: auto, ssh, or winrm.")
     parser.add_argument("--keep-raw-zip", action="store_true", help="Also retain the full raw .zip log archive in <App_Dir>/downloads/<IP>/.")
+    parser.add_argument("--list-only", action="store_true", help="Only list matching remote log packages with PASS/FAIL & MES end time without downloading/extracting.")
     parser.add_argument("--input-dir", required=False, default=None, help="Path to local raw test log directory or archive (.zip/.tar.gz/.tar.xz).")
     parser.add_argument("--target-sn", required=False, default=None, help="Target serial number (e.g. SAFVN..., SGFVN..., FVB..., PM...).")
     parser.add_argument("--output-dir", required=False, default=None, help="Path to output base directory (default: <App_Dir>/reports).")
@@ -3145,9 +3786,10 @@ def main():
                 bridge_transport=args.bridge_transport,
                 keep_raw_zip=args.keep_raw_zip,
                 diagnose=args.diagnose,
-                interactive=(args.latest is None and sys.stdin.isatty()),
-                export_csv=True,
+                interactive=(args.latest is None and not args.list_only and sys.stdin.isatty()),
+                export_csv=not args.list_only,
                 custom_csv_path=args.export_summary_csv,
+                list_only=args.list_only,
             )
         except Exception as exc:
             print(f"{Color.RED}✖ Lỗi kết nối/trích xuất từ xa: {exc}{Color.RESET}")
