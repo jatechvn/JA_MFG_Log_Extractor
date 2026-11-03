@@ -38,7 +38,7 @@ if not errorlevel 1 exit /b 0
 :launch
 cd /d "%~dp0"
 chcp 65001 >nul
-title JA_MFG_Log_Extractor v1.7.0 - Cong Cu Trich Xuat Log Tu Dong (IO, Chassis ^& PSU)
+title JA_MFG_Log_Extractor v1.7.1 - Cong Cu Trich Xuat Log Tu Dong (IO, Chassis ^& PSU)
 set "PYTHONNOUSERSITE=1"
 set "PYTHONPATH="
 

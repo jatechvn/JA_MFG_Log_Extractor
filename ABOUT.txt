@@ -3,8 +3,8 @@ CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
 Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis 2U/4U/5U & PSU 2U/5U)
-Phiên bản      : 1.7.0+1
-Ngày phát hành : 2026-11-02
+Phiên bản      : 1.7.1+1
+Ngày phát hành : 2026-11-03
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
@@ -12,7 +12,7 @@ Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xu�
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
 Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG, PSU 2U DYJW5 & PSU 5U 0R4C4).
 
-TÍNH NỔI BẬT (v1.7.0):
+TÍNH NỔI BẬT (v1.7.1):
 1. Chạy Trực tiếp trên Máy Trạm & Trích xuất Từ xa qua Liên kết Gián tiếp (Indirect Bridge):
    - Kết nối trực tiếp hoặc xuyên mạng tự động từ máy kỹ sư (`172.21.*.*`) qua trạm cầu nối
      Jump-Host (`172.21.168.241` / `172.19.208.133`) tới toàn bộ trạm kiểm thử (`172.19.*.*`)

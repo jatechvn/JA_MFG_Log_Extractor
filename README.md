@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.7.0-blue)
+![Version](https://img.shields.io/badge/version-1.7.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -13,7 +13,7 @@
 
 | Chủng loại | Tiền tố SN / Dấu hiệu | File báo cáo xuất ra (`reports/<SN>/`) | Mô tả |
 | :--- | :--- | :--- | :--- |
-| **Chassis 5U Dell** | `SGF...` / `W47DG` / `5U84` | `FW.txt`, `VPD.txt` | Dell 5U84 Chassis (PN W47DG). Trích xuất `FW.txt` (21 dòng: Midplane VPD 0x13, CRC, CPLD, 8 firmware Element 0..3, 8 địa chỉ SAS expander) và `VPD.txt` (216 dòng: VPD 16, VPD 18, 8 khối Canister VPD 48 hex diff, 7 khối set_midplanevpd 2..8, Customer VPD validation). |
+| **Chassis 5U Dell** | `SGF...` / `W47DG` / `5U84` | `FW.txt`, `VPD.txt` | Dell 5U84 Chassis (PN W47DG). Trích xuất `FW.txt` (21 dòng: Midplane VPD structure/CRC/CPLD từ step 07 `vpd_validation`, 8 firmware Element 0..3, 8 địa chỉ SAS expander) và `VPD.txt` (216 dòng: VPD 16, VPD 18, 8 khối Canister VPD 48 hex diff, 7 khối set_midplanevpd 2..8, Customer VPD validation). |
 | **PSU 2U & 5U** | `PMV...` / `DYJW5` / `0R4C4` | `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` | Bóc tách tích hợp 4 phần từ Step 06 (`PCM firmware`, `VPD 40/41 hex diff`) và Step 07 (`VPD 60/61 hex dump`, `Customer VPD validation`). Tự động nhận diện 2U (`DYJW5`) vs 5U (`0R4C4`), tự động phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2). |
 | **IO Controller chuẩn** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
 | **IOM RPC73** | `SAF...` (VPD 49 chứa `RPC73`) | `FW_VPD.txt` | Tự động nhận diện Canister ME52XX EBOD, bóc tách tích hợp 4 phần từ Step 02 (`Canister firmware`, `FW match`) và Step 07 (`VPD 49 hex dump`, `Customer VPD validation`). |
@@ -22,8 +22,9 @@
 
 ---
 
-## 🚀 Tính năng nổi bật (v1.7.0)
+## 🚀 Tính năng nổi bật (v1.7.1)
 
+- **Hiệu chỉnh W47DG (`FW.txt`)**: Đọc 3 dòng `Midplane VPD structure`, `Midplane VPD CRC`, `Midplane CPLD` từ Step 07 (`vpd_validation` sau ghi VPD), không dùng trạng thái trước ghi ở Step 02.
 - Bảng log có kết quả PASS/FAIL/RUN, thời gian bắt đầu và thời gian cập nhật file cuối; co cột trên terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn.
 - Chọn `P`/`F` chỉ lấy gói khớp kết quả; nếu không có gói phù hợp, chương trình yêu cầu chọn lại.
 - Sơ đồ 3 Line, gợi ý Clipboard/lịch sử IP và SN, tái sử dụng SSH theo máy test, mở thư mục `[O]`, copy đường dẫn `[C]` và xuất `retry_failed.csv`.

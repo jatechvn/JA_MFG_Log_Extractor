@@ -7,6 +7,20 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.7.1] - 2026-11-03
+
+### 🐛 Hiệu chỉnh & Sửa lỗi (Bug Fixes)
+- **Hiệu chỉnh nguồn trích xuất Midplane VPD cho Chassis 5U Dell (`W47DG`)**:
+  - `FW.txt` đọc 3 dòng `Midplane VPD structure`, `Midplane VPD CRC`, `Midplane CPLD` trực tiếp từ bước kiểm chứng sau ghi Step 07 (`vpd_validation`) thông qua `extract_chassis_5u_midplane_validation()`, thay vì đọc trạng thái trước khi ghi ở Step 02 (`check_and_load_fw_test`).
+  - Chủ động kiểm tra tính toàn vẹn của block 3 dòng Midplane ở Step 07 và báo lỗi rõ ràng nếu thiếu dữ liệu; giữ nguyên 8 dòng Sled Element 0..3 Firmware từ Step 02, 8 địa chỉ SAS expander từ Step 07 và toàn bộ `VPD.txt`.
+- **Kiểm thử Tự động (`tests/test_w47dg_fw.py`)**:
+  - Bổ sung bộ unit test kiểm chứng đọc động giá trị `Midplane VPD structure` / `CRC` / `CPLD` từ Step 07 và từ chối fallback sang Step 02 khi Step 07 thiếu block.
+
+### 📦 Phát hành
+- Đồng bộ phiên bản `v1.7.1` trên toàn bộ mã nguồn, launcher, tài liệu và gói Portable ZIP.
+
+---
+
 ## [v1.7.0] - 2026-11-02
 
 ### Nâng cấp

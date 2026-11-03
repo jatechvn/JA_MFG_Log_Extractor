@@ -31,3 +31,11 @@
 - Verified package installed into dist with updated manifest/checksum. Runtime/data and all unmodified ZIP members retained; previous source/docs/package/replaced dist files backed up (path in ../verify_20261102_v170/four_fixes/backup_path.txt).
 - New ZIP SHA256: e924357c3f2908230b0e97924e5a714aa17104cc9399b6f9c593cdcee80d0bf9.
 - Detailed evidence: ../verify_20261102_v170/four_fixes/FIX_REPORT.md. No commit, GitHub publication or Drive sync. Native Explorer/physical keyboard and Clipboard remain unverified.
+
+## W47DG FW Midplane correction (v1.7.1) — 2026-11-03
+
+- User corrected the source contract: FW.txt Midplane structure/CRC/CPLD must come from Step 07 vpd_validation, never Step 02. Historical sample/skill statements using 0x13 and AA7722D1 are superseded for these three fields; do not restore them to regain old sample parity.
+- extract_chassis_5u_midplane_validation reads a complete Step 07 block dynamically and rejects missing/incomplete status. The real SGFVN26418364D7 raw log lines 107–109 give 0x14 / 0x4BC5F496 / 0x20.
+- 11 unit tests pass; source and extracted-package runtimes pass seven actual cases. Only W47DG structure/CRC bytes differ from old FW sample; other FW bytes, VPD.txt and twelve reports from other product cases are unchanged. Integration probe rejects missing Step 07 despite valid Step 02.
+- Synchronized v1.7.1 across source, launcher, docs, and packaged `dist/JA_MFG_Log_Extractor_v1.7.1_Windows_x64.zip` (SHA256: `24c9d174780f7c263b2f98f7d324e40525d74ebbfb8630133a050872ae8936b4`).
+- Details/corrected reports: ../verify_20261103_w47dg/REPORT.md and source/5u/SGFVN26418364D7/FW.txt under that verification directory. Original production reports/Sample unchanged.

@@ -1,17 +1,17 @@
-TAG=v1.7.0
-TITLE=JA_MFG_Log_Extractor v1.7.0 — Chọn log theo kết quả, sơ đồ IP và thao tác nhanh
+TAG=v1.7.1
+TITLE=JA_MFG_Log_Extractor v1.7.1 — Hiệu chỉnh Midplane VPD W47DG (Step 07) & Tối ưu Trạm Từ Xa
 BODY=
-## JA_MFG_Log_Extractor v1.7.0 — Chọn log theo kết quả, sơ đồ IP và thao tác nhanh
+## JA_MFG_Log_Extractor v1.7.1 — Hiệu chỉnh Midplane VPD W47DG (Step 07) & Tối ưu Trạm Từ Xa
 
-Bản cập nhật **v1.7.0** bổ sung chọn log theo PASS/FAIL, sơ đồ IP 3 Line, gợi ý Clipboard/lịch sử và thao tác nhanh khi phân tích log tại `<App_Dir>/reports/`.
+Bản cập nhật **v1.7.1** hiệu chỉnh nguồn trích xuất 3 dòng trạng thái Midplane VPD trong `FW.txt` của dòng **Chassis 5U Dell (`W47DG`)** từ Step 07 (`vpd_validation`), đồng thời kế thừa toàn bộ tính năng bảng chọn log PASS/FAIL, sơ đồ IP 3 Line, gợi ý Clipboard/lịch sử và thao tác nhanh từ nhánh v1.7.x.
 
-### Thay đổi trong v1.7.0
-- Chọn `P`/`F` chỉ lấy gói có kết quả phù hợp; không có gói khớp thì yêu cầu chọn lại. Hỗ trợ `L`, `A` và dải số.
-- Bảng co cho terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn. Thời gian kết thúc dựa trên mtime của file, không phải xác nhận độc lập từ MES.
-- Sơ đồ 3 Line, IP rút gọn, gợi ý Clipboard và lịch sử 5 IP/SN gần nhất; `[O]` mở báo cáo, `[C]` copy đường dẫn.
-- Tái sử dụng SSH trên cùng máy, fail-fast theo host và xuất `retry_failed.csv` khi batch lỗi.
-- `--list-only` không tải log và không cập nhật history; unit test cô lập history để bảo toàn dữ liệu thật.
-- Launcher và tài liệu đồng bộ v1.7.0. PSU 2U giữ dòng hex `00a0:` trong báo cáo 117 dòng.
+### Thay đổi trong v1.7.1
+- **Hiệu chỉnh W47DG (`FW.txt`)**: 3 dòng `Midplane VPD structure`, `Midplane VPD CRC`, `Midplane CPLD` trong `FW.txt` được trích xuất từ Step 07 (`vpd_validation` — trạng thái sau khi ghi VPD), không dùng trạng thái trước khi ghi ở Step 02. Báo lỗi tường minh nếu thiếu block Step 07; giữ nguyên 8 dòng Sled firmware và `VPD.txt`.
+- **Chọn lọc kết quả thông minh**: Chọn `P`/`F` chỉ lấy gói có kết quả phù hợp; không có gói khớp thì yêu cầu chọn lại. Hỗ trợ `L`, `A` và dải số (`1-3, 5`).
+- **Hiển thị thích ứng**: Bảng co cho terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn. Thời gian kết thúc dựa trên mtime của file.
+- **Sơ đồ 3 Line & Thao tác nhanh**: Sơ đồ 3 Line, IP rút gọn, gợi ý Clipboard và lịch sử 5 IP/SN gần nhất; `[O]` mở báo cáo, `[C]` copy đường dẫn.
+- **Tối ưu kết nối SSH & Batch**: Tái sử dụng SSH trên cùng máy, fail-fast theo host và xuất `retry_failed.csv` khi batch lỗi.
+- **An toàn dữ liệu**: `--list-only` không tải log và không cập nhật history; unit test cô lập history để bảo toàn dữ liệu thật. PSU 2U (`DYJW5`) giữ dòng hex `00a0:` trong báo cáo 117 dòng.
 
 ### Điểm nhấn chính:
 - **Chạy Trực tiếp & Trích xuất Từ xa qua Liên kết Gián tiếp (Menu `[1]` / `--ip` & `--sn`)**:
@@ -26,4 +26,4 @@ Bản cập nhật **v1.7.0** bổ sung chọn log theo PASS/FAIL, sơ đồ IP 
   - Tích hợp sẵn `paramiko`, `cryptography`, `bcrypt`, `pynacl` cùng các thư viện chuẩn cần thiết vào `python_runtime` Portable — chạy ngay trên mọi máy Windows không cần cài đặt Python hay thư viện ngoài.
 
 ### Cài đặt & Sử dụng:
-Giải nén gói `JA_MFG_Log_Extractor_v1.7.0_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` nếu chưa có (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Giữ lại cấu hình và dữ liệu reports/downloads đang dùng khi cập nhật. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
+Giải nén gói `JA_MFG_Log_Extractor_v1.7.1_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` nếu chưa có (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Giữ lại cấu hình và dữ liệu reports/downloads đang dùng khi cập nhật. Xem chi tiết tại `USERGUIDE.md` và `README.md`.

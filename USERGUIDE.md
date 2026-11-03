@@ -1,9 +1,10 @@
-# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.7.0
+# Hướng dẫn sử dụng JA_MFG_Log_Extractor v1.7.1
 
 Tài liệu hướng dẫn chi tiết các thao tác vận hành, cấu hình kết nối từ xa (Indirect Bridge) và sử dụng công cụ **JA_MFG_Log_Extractor** dành cho kỹ sư kiểm thử (TE), kỹ sư sản xuất (PE), kỹ sư phân tích lỗi (FA) và nhân viên vận hành trạm test.
 
-### Thao tác mới trong v1.7.0
+### Thao tác mới trong v1.7.1
 
+- **Chassis 5U Dell (`W47DG`)**: `FW.txt` đọc 3 dòng `Midplane VPD structure`, `Midplane VPD CRC`, `Midplane CPLD` trực tiếp từ Step 07 (`vpd_validation`) và báo lỗi nếu thiếu block này.
 - Chọn IP trên sơ đồ 3 Line bằng phím mũi tên hoặc nhập `.174`, `174`, `116.174`. Clipboard và lịch sử hỗ trợ gợi ý IP/SN.
 - Trong bảng log, `P` chỉ chọn PASS, `F` chỉ chọn FAIL, `L` chọn mới nhất, `A` chọn tất cả; hỗ trợ `1-3, 5`. Không có gói khớp thì chương trình yêu cầu chọn lại; `Ctrl+C` hủy thao tác.
 - Bảng tự co cho terminal 80 cột; cửa sổ hẹp hơn dùng danh sách để giữ đầy đủ thời gian.
@@ -52,7 +53,7 @@ Khi khởi động, màn hình menu chính hiển thị 7 lựa chọn. Toàn b�
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.7.0  │
+│  CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS) - v1.7.1  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Vui lòng chọn chế độ làm việc:

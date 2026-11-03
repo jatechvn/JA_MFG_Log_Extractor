@@ -19,7 +19,7 @@ import ast
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 APP_BUILD = "1"
 
 _PRINT_LOCK = threading.Lock()
@@ -615,11 +615,25 @@ def find_chassis_5u_fw_step_dir(test_results_dir):
                 return full_p
     return find_step_dir(test_results_dir, "check_and_load_fw_test")
 
+def extract_chassis_5u_midplane_validation(lines):
+    """Read one complete Midplane status block from vpd_validation (Step 07)."""
+    markers = ("Midplane VPD structure", "Midplane VPD CRC", "Midplane CPLD")
+    for i, line in enumerate(lines):
+        if '|0250|Midplane VPD structure' not in line:
+            continue
+        block = lines[i:i + 3]
+        if len(block) == 3 and all(
+            f'|0250|{marker}' in row for marker, row in zip(markers, block)
+        ):
+            return [row[row.index('|0250|'):].rstrip('\r\n') for row in block]
+    raise ValueError("W47DG: incomplete Midplane status block in Step 07 vpd_validation; Step 02 is not a valid fallback.")
+
+
 def extract_chassis_5u_dell_logs(input_dir, target_sn, output_base):
     """
     Extract Chassis 5U Dell (PN W47DG) report files:
     1. FW.txt:
-       - Midplane VPD structure, CRC, CPLD (from Step 02, fallback Step 07)
+       - Midplane VPD structure, CRC, CPLD from Step 07 vpd_validation only
        - Sled 1/2 Element 0-3 Firmware (8 lines)
        - Expander SAS addresses sorted exp:0 to exp:7 (8 lines from Step 07)
     2. VPD.txt:
@@ -664,7 +678,7 @@ def extract_chassis_5u_dell_logs(input_dir, target_sn, output_base):
     with open(to_long_path(s07_log_path), 'r', encoding='utf-8', errors='ignore') as f:
         s07_lines = [l.rstrip('\r\n') for l in f]
 
-    # 1. Generate FW.txt
+    # 1. Generate FW.txt. Preserve existing Sled FW selection from Step 02.
     candidates = []
     for i in range(len(fw_lines)):
         l = fw_lines[i]
@@ -703,6 +717,9 @@ def extract_chassis_5u_dell_logs(input_dir, target_sn, output_base):
                     if 'Sled ' in s07_lines[j] and 'Element ' in s07_lines[j]:
                         fw_b2.append(s07_lines[j][s07_lines[j].find('|0250|'):])
                 break
+
+    # Midplane status must reflect validation, never the pre-write Step 02 state.
+    fw_b1 = extract_chassis_5u_midplane_validation(s07_lines)
 
     # Expander SAS addresses from Step 07
     exp_sas_dict = {}

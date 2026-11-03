@@ -14,7 +14,7 @@ from .local_config import load_local_config
 
 
 APP_NAME = "JA_MFG_Log_Extractor"
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 
 
 def get_script_dir() -> Path:
