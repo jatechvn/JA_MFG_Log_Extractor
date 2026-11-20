@@ -1,0 +1,30 @@
+# Bản đồ mã nguồn JA_MFG_Log_Extractor
+
+[Quy tắc của repo](../AGENTS.md) · [Hành vi CLI và mẫu báo cáo](../USERGUIDE.md) · [Handoff hiện hành](AI_HANDOFF.md) · [Kế hoạch tách module](MODULE_SPLIT_PLAN.md)
+
+## Luồng hiện tại
+
+[Launcher](../Chay_Tool_Log.bat) → [`main()`](../extract_mfg_logs.py) → cờ CLI hoặc [menu tương tác](../module/cli_ui.py), rồi đến local, remote, batch hoặc cycle-time. Local chuẩn bị input và phân loại PN/SN trong [`process_single_extraction()`](../module/extraction_workflows.py); remote điều phối tìm, chọn và tải qua `SshLogService` trong [`process_remote_extraction()`](../module/extraction_workflows.py), rồi gọi luồng local. Luồng local gọi parser theo loại thiết bị, ghi báo cáo dưới thư mục output đã chọn và trả kết quả cho CLI/CSV. Batch giữ khóa và tái sử dụng SSH theo host trong [`run_batch_extraction()`](../module/extraction_workflows.py). `--verify-sample` so sánh output với thư mục mẫu độc lập.
+
+| Cần sửa | Bắt đầu ở đâu | Kiểm tra gần nhất |
+| --- | --- | --- |
+| P61070-001 (MSA 2070 FC) | [module/extract_p61070.py](../module/extract_p61070.py): `check_is_p61070()`, `extract_p61070_logs()`, `render_p61070_cli_report()`, `render_p61070_raw_report()` | `tests/test_p61070_reports.py`; Step 62 + Step 58 cert sau reset, lọc đúng SN/controller cho `FW.txt` và `FW_RAW.md` |
+| S1H41-62001 (MSA 2070 FC LFF Chassis) | [module/extract_s1h41.py](../module/extract_s1h41.py): `check_is_s1h41()`, `extract_s1h41_logs()`, `render_s1h41_cli_report()`, `render_s1h41_raw_report()` | `tests/test_s1h41_reports.py`; Step 57/55 `show firmware-bundles all` + Step 62 + Step 58 cert A/B cho `FW.txt` và `FW_RAW.md` |
+| S3T80-62001 (MSA 2070 32Gb FC SFF Chassis) | [module/extract_s3t80.py](../module/extract_s3t80.py): `check_is_s3t80()`, `extract_s3t80_logs()`, `render_s3t80_cli_report()`, `render_s3t80_raw_report()` | `tests/test_s3t80_reports.py`; Step 62 (`show firmware-bundles`, `show frus secrets`, 24 slots) + Step 58 cert A/B cho `FW.txt` và `FW_RAW.md` |
+| W47DG / 7PNTN | [module/extract_chassis_5u.py](../module/extract_chassis_5u.py): `extract_chassis_5u_dell_logs()`, `extract_chassis_5u_midplane_validation()` và `extract_7pntn_*()` | `tests/test_w47dg_fw.py`, `tests/test_7pntn_reports.py`; xác minh riêng từng PN |
+| RPC73 / 9D57G | [module/extract_rpc73.py](../module/extract_rpc73.py): `extract_iom_rpc73()`, `extract_rpc73_revision_vpd()`, `detect_rpc73_controller_from_vpd()` | `tests/test_rpc73_reports.py`; đúng canister theo SN; layout 3898 của RPC73/9D57G lấy đến hết `fru_description` |
+| PSU 2U DYJW5 / 5U 0R4C4 | [module/extract_psu.py](../module/extract_psu.py): `check_is_psu()`, `detect_psu_model_info()`, `detect_psu_unit_id()`, `extract_psu_logs()` | CLI và ZIP trên cả PCM 1 và PCM 2 của mỗi mẫu |
+| Juno 4U (FVB) | [module/extract_juno.py](../module/extract_juno.py): `extract_chassis_4u_logs()` | Sáu file của ca FVBTL0000E qua thư mục raw và ZIP raw có tar.xz trong `enc_logs` |
+| IO, Chassis 2U | [module/extract_basic.py](../module/extract_basic.py): `extract_fw()`, `extract_vpd()`, `extract_chassis_vpd()` | IO cả hai controller, Chassis 2U theo SN, kiểm thư mục raw và ZIP thử của từng loại |
+| I/O log và báo cáo | [module/log_io.py](../module/log_io.py): `prepare_log_input_source()`, `find_step_dir()`, `clean_log_lines()`, `write_extracted_file()`, `resolve_output_paths()` | Đối chiếu baseline thư mục/ZIP, lỗi thiếu step, đường dẫn dài và CRLF |
+| Cycle-time, CSV, chẩn đoán và đối chiếu mẫu | [module/reporting.py](../module/reporting.py): `extract_cycle_time_metadata()`, `export_cycle_time_summary_csv()`, `validate_extracted_reports()`, `analyze_test_failures()`, `compare_with_golden_sample()` | CSV đơn/batch/cycle-time, `ERROR_SUMMARY.txt`, mẫu khớp và khác |
+| Điều phối trích xuất một thiết bị | [module/extraction_workflows.py](../module/extraction_workflows.py): `process_single_extraction()`, `determine_controller()` | Thư mục/ZIP, tên file đích, lỗi thiếu step và bàn giao từ remote mock |
+| Điều phối batch | [module/extraction_workflows.py](../module/extraction_workflows.py): `run_batch_extraction()`, `is_remote_ip_target()` | Thứ tự kết quả, khóa theo host, tái sử dụng SSH, fail-fast và CSV retry |
+| Menu, phím tắt, sơ đồ trạm và hộp thoại | [module/cli_ui.py](../module/cli_ui.py): `run_interactive_menu_once()`, `get_single_key_choice()`, `prompt_ip_with_station_map()`, `open_native_path_dialog()` | So trước/sau các chế độ, phím và đầu ra Windows qua Python/BAT |
+| Đọc đầu vào batch và chạy chế độ cycle-time | [extract_mfg_logs.py](../extract_mfg_logs.py): `parse_csv_file()`, `scan_parent_folder_for_logs()`, `run_cycle_time_analysis()` | CSV đầu vào, thư mục/ZIP và xuất CSV cycle-time |
+| Điều phối remote | [module/extraction_workflows.py](../module/extraction_workflows.py): `process_remote_extraction()`, `detect_sns_from_folder()` | Remote mock kiểm chọn lượt, tải, tái sử dụng phiên, CSV retry và list-only |
+| SSH, bridge, WinRM hoặc cấu hình | [Hướng dẫn module](../module/README.md) | `tests/test_smart_features.py`; tách kiểm tra mock khỏi nghiệm thu mạng thật |
+| Tìm test hoặc bằng chứng từ raw | [Hướng dẫn tests](../tests/README.md) | `python -B -m unittest discover -s tests` |
+| Đóng gói và đường dẫn runtime | [build.bat](../build.bat), [Chay_Tool_Log.bat](../Chay_Tool_Log.bat), [module/config.py](../module/config.py) | ZIP thử trong staging; không dùng `dist` đang chạy để kiểm tra |
+
+[`module/`](../module/) chứa I/O dùng chung, parser Dell 5U, RPC73/9D57G, PSU, Juno 4U, IO và Chassis 2U, báo cáo, điều phối local/remote/batch, transport, cấu hình, hỗ trợ CLI và lịch sử; [`tests/`](../tests/) chứa unittest Python. `extract_mfg_logs.py` giữ argparse, dispatch và kết nối hành động CLI với menu, đồng thời giữ tên các hàm đã chuyển để tương thích với caller hiện tại. Các đường dẫn `verify_*`, `reports`, `downloads` và `dist` là dữ liệu hoặc bằng chứng cục bộ, không phải module nguồn hay fixture có thể giả định trên clone mới.

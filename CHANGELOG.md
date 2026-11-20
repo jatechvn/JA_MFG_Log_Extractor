@@ -7,6 +7,49 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.8.0] - 2026-11-20
+
+### 🚀 Nâng cấp & Tính năng mới (Features & Enhancements)
+- **Hỗ trợ 3 Dòng Thiết bị HPE MSA 2070 (Chuẩn FAIR)**:
+  - **IO Controller `P61070-001`**: Nhận diện theo PN metadata hoặc tên gói log, bóc tách 5 lệnh FAIR Section 4 (`show firmware-bundles`, `show system`, `show frus detail`, `show configuration` giữ bảng `Versions` 2 cột A & B độc lập, lọc riêng target SN, và `show certificates` sau reset cuối). Sinh bộ đôi `FW.txt` (định dạng CLI sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột kèm dump YAML).
+  - **Chassis FC LFF `S1H41-62001`**: Bóc tách 6 lệnh FAIR Section 5 gồm `show firmware-bundles all` (XML cuối có trạng thái `Active/Default`), `show system`, `show license`, `show frus detail`, `show configuration` (giữ đủ 2 controller A & B, bảng `Versions` và `PSU Versions` 2 cột, Ports A & B kèm `Speed(C)`, Disks/Slots/Pools/FRUs), và `show certificates` (cả A & B). Sinh `FW.txt` và `FW_RAW.md`.
+  - **Chassis 32Gb FC SFF `S3T80-62001`**: Bóc tách 7 lệnh FAIR Section 4 gồm `show firmware-bundles`, `show system`, `show license`, `show fru detail`, `show fru secrets detail` (`Midplane Information`), `show configuration` (24 drive slots SFF, Ports 32Gb kèm `Speed(A)`/`Speed(C)`), và `show certificates`. Sinh `FW.txt` và `FW_RAW.md`.
+- **Hỗ trợ Dell 5U PN `7PNTN`**:
+  - Tự động nhận diện PN `7PNTN` qua metadata hoặc tên gói. Trích xuất `FW.txt` (31 dòng: bổ sung 5 cặp Fan Controller từ Step 07 trước Sled) và `VPD.txt` (260 dòng: VPD 16 đến 0090, VPD 18 đến 00a0 + 0360/0370, WWN, Customer VPD 18, Fan VPD 122–126 và Canister VPD 48 từ Step 06).
+- **Chuẩn hóa IOM `9D57G` & RPC73**:
+  - Nhận diện canister qua VPD 49; với log mã `|3898|`, chọn canister theo SN trong VPD 49, PN `RPC73` và `9D57G` lấy bảng validation đến hết dấu phân cách sau `fru_description` (140 dòng), bảo toàn CRLF cuối file.
+  - Hiển thị nhãn dòng sản phẩm `IOM 9D57G` trong banner, bảng kết quả và CSV khi tên gói mang mã `9D57G`.
+
+### 🏗 Kiến trúc & Tái cấu trúc (Architecture & Refactoring)
+- **Tách Kiến Trúc Module Hóa (`module/`)**:
+  - Tách mã nguồn nguyên khối thành 10 module độc lập chuyên trách:
+    - `module/log_io.py`: Quản lý stream nén, I/O file an toàn, chuẩn hóa đường dẫn.
+    - `module/extract_basic.py`: Bộ bóc tách cho IO Controller chuẩn (`SAF...`) và Chassis 2U.
+    - `module/extract_chassis_5u.py`: Bộ bóc tách cho Dell 5U (`W47DG`, `7PNTN`).
+    - `module/extract_rpc73.py`: Bộ bóc tách cho IOM RPC73 và 9D57G.
+    - `module/extract_psu.py`: Bộ bóc tách cho PSU 2U (`DYJW5`) và 5U (`0R4C4`).
+    - `module/extract_juno.py`: Bộ bóc tách cho Chassis 4U Juno/Oracle.
+    - `module/extract_p61070.py`: Bộ bóc tách chuyên biệt cho HPE MSA P61070-001.
+    - `module/extract_s1h41.py`: Bộ bóc tách chuyên biệt cho HPE MSA S1H41-62001.
+    - `module/extract_s3t80.py`: Bộ bóc tách chuyên biệt cho HPE MSA S3T80-62001.
+    - `module/extraction_workflows.py`: Điều phối quy trình trích xuất (Local, Remote qua Bridge, Batch).
+    - `module/reporting.py`: Tổng hợp báo cáo, đối soát Golden Sample, xuất Cycle Time & chẩn đoán lỗi.
+    - `module/cli_ui.py`: Điều hướng console UI, menu tương tác và hộp thoại native Windows.
+    - `module/console_style.py`: Quản lý màu sắc ANSI console dùng chung.
+  - Giữ vững 100% khả năng tương thích ngược hoàn toàn cho launcher và CLI entrypoint `extract_mfg_logs.py`.
+
+### 🧪 Kiểm thử Tự động & Chất lượng (Testing & Quality)
+- **Mở rộng Bộ Kiểm Thử (43 Unit Tests Pass)**:
+  - Bổ sung các bộ test độc lập: `tests/test_7pntn_reports.py`, `tests/test_p61070_reports.py`, `tests/test_rpc73_reports.py`, `tests/test_s1h41_reports.py`, `tests/test_s3t80_reports.py`.
+  - Toàn bộ 43 unit tests đều vượt qua (100% byte-for-byte SHA256 verified) đối chiếu mẫu chuẩn và các ca hồi quy.
+- **Tích hợp XML Parser vào Python Runtime Nhúng**:
+  - Bổ sung thư viện chuẩn `xml` vào `dist/python_runtime/Lib/xml` đảm bảo parser HPE hoạt động trơn tru trên mọi môi trường độc lập không cần Python ngoài.
+
+### 📦 Phát hành
+- Đồng bộ phiên bản `v1.8.0` trên toàn bộ mã nguồn, launcher, tài liệu hướng dẫn và bản đóng gói phát hành.
+
+---
+
 ## [v1.7.1] - 2026-11-03
 
 ### 🐛 Hiệu chỉnh & Sửa lỗi (Bug Fixes)

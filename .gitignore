@@ -2,6 +2,9 @@
 # Git Ignore for JA_MFG_Log_Extractor
 # ==============================================================================
 
+# Keep the shared root agent guide trackable even with a global AGENTS.md ignore.
+!/AGENTS.md
+
 # Raw Manufacturing Test Logs & Data folders
 2U/
 2U24/

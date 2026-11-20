@@ -1,29 +1,32 @@
-TAG=v1.7.1
-TITLE=JA_MFG_Log_Extractor v1.7.1 — Hiệu chỉnh Midplane VPD W47DG (Step 07) & Tối ưu Trạm Từ Xa
+TAG=v1.8.0
+TITLE=JA_MFG_Log_Extractor v1.8.0 — Kiến trúc Module hóa, Hỗ trợ HPE MSA 2070 (P61070/S1H41/S3T80), Dell 5U 7PNTN & IOM 9D57G
 BODY=
-## JA_MFG_Log_Extractor v1.7.1 — Hiệu chỉnh Midplane VPD W47DG (Step 07) & Tối ưu Trạm Từ Xa
+## JA_MFG_Log_Extractor v1.8.0 — Kiến trúc Module hóa, Hỗ trợ HPE MSA 2070 (P61070/S1H41/S3T80), Dell 5U 7PNTN & IOM 9D57G
 
-Bản cập nhật **v1.7.1** hiệu chỉnh nguồn trích xuất 3 dòng trạng thái Midplane VPD trong `FW.txt` của dòng **Chassis 5U Dell (`W47DG`)** từ Step 07 (`vpd_validation`), đồng thời kế thừa toàn bộ tính năng bảng chọn log PASS/FAIL, sơ đồ IP 3 Line, gợi ý Clipboard/lịch sử và thao tác nhanh từ nhánh v1.7.x.
+Bản cập nhật lớn **v1.8.0** đánh dấu bước chuyển mình quan trọng của hệ thống với kiến trúc module hóa toàn diện (`module/`), mở rộng khả năng trích xuất chuyên sâu cho 3 dòng thiết bị **HPE MSA 2070** theo chuẩn FAIR (`P61070-001`, `S1H41-62001`, `S3T80-62001`), hỗ trợ **Dell 5U PN 7PNTN**, chuẩn hóa **IOM 9D57G**, đồng thời mở rộng bộ kiểm thử tự động lên **43 Unit Tests** đạt 100% tỷ lệ vượt qua.
 
-### Thay đổi trong v1.7.1
-- **Hiệu chỉnh W47DG (`FW.txt`)**: 3 dòng `Midplane VPD structure`, `Midplane VPD CRC`, `Midplane CPLD` trong `FW.txt` được trích xuất từ Step 07 (`vpd_validation` — trạng thái sau khi ghi VPD), không dùng trạng thái trước khi ghi ở Step 02. Báo lỗi tường minh nếu thiếu block Step 07; giữ nguyên 8 dòng Sled firmware và `VPD.txt`.
-- **Chọn lọc kết quả thông minh**: Chọn `P`/`F` chỉ lấy gói có kết quả phù hợp; không có gói khớp thì yêu cầu chọn lại. Hỗ trợ `L`, `A` và dải số (`1-3, 5`).
-- **Hiển thị thích ứng**: Bảng co cho terminal 80 cột, dùng danh sách khi cửa sổ hẹp hơn. Thời gian kết thúc dựa trên mtime của file.
-- **Sơ đồ 3 Line & Thao tác nhanh**: Sơ đồ 3 Line, IP rút gọn, gợi ý Clipboard và lịch sử 5 IP/SN gần nhất; `[O]` mở báo cáo, `[C]` copy đường dẫn.
-- **Tối ưu kết nối SSH & Batch**: Tái sử dụng SSH trên cùng máy, fail-fast theo host và xuất `retry_failed.csv` khi batch lỗi.
-- **An toàn dữ liệu**: `--list-only` không tải log và không cập nhật history; unit test cô lập history để bảo toàn dữ liệu thật. PSU 2U (`DYJW5`) giữ dòng hex `00a0:` trong báo cáo 117 dòng.
+### 🌟 Điểm nổi bật trong v1.8.0:
+- **Kiến trúc Module hóa Tinh gọn (`module/`)**:
+  - Tách mã nguồn nguyên khối thành 10 module độc lập chuyên trách (`log_io`, `extract_basic`, `extract_chassis_5u`, `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_p61070`, `extract_s1h41`, `extract_s3t80`, `extraction_workflows`, `reporting`, `cli_ui`, `console_style`).
+  - Bảo toàn 100% tương thích ngược caller entrypoint và CLI arguments.
+- **Hỗ trợ 3 Dòng Thiết bị HPE MSA 2070 (Chuẩn FAIR)**:
+  - **IO Controller `P61070-001`**: Trích xuất 5 lệnh Section 4 FAIR (`show firmware-bundles`, `show system`, `show frus detail`, `show configuration` giữ bảng `Versions` 2 cột A & B độc lập, lọc riêng target SN, và `show certificates` sau reset cuối). Sinh bộ đôi `FW.txt` (định dạng CLI sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột kèm dump YAML).
+  - **Chassis FC LFF `S1H41-62001`**: Trích xuất 6 lệnh Section 5 FAIR gồm `show firmware-bundles all` (XML cuối có trạng thái `Active/Default`), `show system`, `show license`, `show frus detail`, `show configuration` (giữ đủ 2 controller A & B, bảng `Versions` và `PSU Versions` 2 cột, Ports A & B kèm `Speed(C)`, Disks/Slots/Pools/FRUs), và `show certificates` (cả A & B). Sinh `FW.txt` và `FW_RAW.md`.
+  - **Chassis 32Gb FC SFF `S3T80-62001`**: Trích xuất 7 lệnh Section 4 FAIR gồm `show firmware-bundles`, `show system`, `show license`, `show fru detail`, `show fru secrets detail` (`Midplane Information`), `show configuration` (24 drive slots SFF, Ports 32Gb kèm `Speed(A)`/`Speed(C)`), và `show certificates`. Sinh `FW.txt` và `FW_RAW.md`.
+- **Hỗ trợ Dell 5U PN `7PNTN`**:
+  - Trích xuất `FW.txt` (31 dòng: bổ sung 5 cặp Fan Controller từ Step 07 trước Sled) và `VPD.txt` (260 dòng: VPD 16 đến 0090, VPD 18 đến 00a0 + 0360/0370, WWN, Customer VPD 18, Fan VPD 122–126 và Canister VPD 48 từ Step 06).
+- **Chuẩn hóa IOM `9D57G` & RPC73**:
+  - Nhận diện canister qua VPD 49; với log mã `|3898|`, chọn canister theo SN trong VPD 49, PN `RPC73` và `9D57G` lấy bảng validation đến hết dấu phân cách sau `fru_description` (140 dòng), bảo toàn CRLF cuối file.
+  - Hiển thị nhãn dòng sản phẩm `IOM 9D57G` trong banner, bảng kết quả và CSV khi tên gói mang mã `9D57G`.
+- **Kiểm thử Toàn diện (43/43 Unit Tests Pass)**:
+  - 43 bài test tự động kiểm chứng 100% byte-for-byte SHA256 cho toàn bộ các thiết bị mới và cũ, bảo đảm không có hồi quy.
+- **Tích hợp XML Parser vào Python Runtime Nhúng**:
+  - Bổ sung thư viện chuẩn `xml` vào `python_runtime` Portable giúp chạy trơn tru độc lập trên mọi máy trạm Windows.
 
-### Điểm nhấn chính:
-- **Chạy Trực tiếp & Trích xuất Từ xa qua Liên kết Gián tiếp (Menu `[1]` / `--ip` & `--sn`)**:
-  - Tự động định tuyến kết nối trực tiếp hoặc qua cầu nối Jump-Host (`172.21.168.241` / `172.19.208.133`) tới các trạm kiểm thử (`172.19.*.*`) bằng kênh SSH `direct-tcpip` và cơ chế tự động chuyển đổi dự phòng sang WinRM TCP Proxy (`winrm_bridge.ps1`).
-  - Hỗ trợ nhập nhanh IP rút gọn 2 octet (`116.174` hoặc `116174` $\rightarrow$ `172.19.116.174`), tìm kiếm nhiều Serial Number cùng lúc (`SN1, SN2`), và giới hạn số bản test mới nhất (`--latest 1`).
-  - **Selective Fast Fetch**: Chỉ nén và tải các file văn bản nhẹ cần thiết cho phân tích (`debug.log`, `results.json`, `*.log`, `ctp_log_metadata.yaml`, `job.log`, `enc_logs/*`), bỏ qua `serial_logs/`, `sysinfo/`, `.journal.sqlite`, `results.html`, giúp quá trình tải và trích xuất hoàn tất chỉ trong **1–3 giây** và tự động dọn sạch file tạm. Hỗ trợ cờ `--keep-raw-zip` nếu muốn lưu thêm bản `.zip` đầy đủ vào `<App_Dir>/downloads/<IP>/`.
-- **Lưu Báo cáo Tập trung trong Thư mục Ứng dụng (`<App_Dir>/reports/`)**:
-  - Toàn bộ báo cáo trích xuất của mọi chế độ làm việc (Remote IP+SN, Local Folder/Archive, Batch Scan, CSV Import, Cycle Time) mặc định được lưu gọn gàng vào `<App_Dir>/reports/<Target_SN>/` và `<App_Dir>/reports/Cycle_Time_Summary.csv`.
-- **Nâng cấp Bóc tách Log Lỗi VPD (`VPD rendering failed`)**:
-  - Tự động xử lý các bản log kiểm thử bị dừng giữa chừng tại bước `vpd_validation` (ví dụ `EC(30005) VPD rendering failed for chassis FRU-REV`), vẫn trích xuất đầy đủ phần dữ liệu VPD hiện có, gắn cờ cảnh báo `WARN` và tự động sinh báo cáo chẩn đoán lỗi `ERROR_SUMMARY.txt`.
-- **Đóng gói Sẵn sàng Chạy (Self-Contained Portable Runtime)**:
-  - Tích hợp sẵn `paramiko`, `cryptography`, `bcrypt`, `pynacl` cùng các thư viện chuẩn cần thiết vào `python_runtime` Portable — chạy ngay trên mọi máy Windows không cần cài đặt Python hay thư viện ngoài.
+### 🌐 Phân hệ Kế thừa Toàn vẹn:
+- Trích xuất từ xa trực tiếp hoặc qua Indirect Bridge `172.21.168.241` -> `172.19.*.*`.
+- Selective Fast Fetch hoàn tất trong 1–3 giây.
+- Bảng lọc PASS/FAIL, phân tích Cycle Time, đối soát Golden Sample, và xử lý batch đa luồng.
 
 ### Cài đặt & Sử dụng:
-Giải nén gói `JA_MFG_Log_Extractor_v1.7.1_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` nếu chưa có (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Giữ lại cấu hình và dữ liệu reports/downloads đang dùng khi cập nhật. Xem chi tiết tại `USERGUIDE.md` và `README.md`.
+Giải nén gói `JA_MFG_Log_Extractor_v1.8.0_Windows_x64.zip`, sao chép `config_sample.json` thành `config.json` nếu chưa có (điền thông tin xác thực SSH/Bridge nếu dùng tính năng Remote), và nhấp đúp vào `Chay_Tool_Log.bat` hoặc thực thi qua dòng lệnh. Giữ lại cấu hình và dữ liệu `reports/` và `downloads/` đang dùng khi cập nhật. Xem chi tiết tại `USERGUIDE.md` và `README.md`.

@@ -2,61 +2,51 @@
 CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
-Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73, Chassis 2U/4U/5U & PSU 2U/5U)
-Phiên bản      : 1.7.1+1
-Ngày phát hành : 2026-11-03
+Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73/9D57G, Chassis 2U/4U/5U, PSU 2U/5U & HPE MSA 2070)
+Phiên bản      : 1.8.0
+Ngày phát hành : 2026-11-20
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
 MÔ TẢ HỆ THỐNG:
 Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xuất và trích xuất báo cáo
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
-Seagate Enterprise (IO Controller 2U, IOM RPC73, Chassis 2U EBOD, Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG, PSU 2U DYJW5 & PSU 5U 0R4C4).
+Seagate & đối tác Enterprise (IO Controller 2U, IOM RPC73/9D57G, Chassis 2U EBOD,
+Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG/7PNTN, PSU 2U DYJW5 & PSU 5U 0R4C4,
+cùng các dòng HPE MSA 2070 P61070-001, S1H41-62001, S3T80-62001).
 
-TÍNH NỔI BẬT (v1.7.1):
-1. Chạy Trực tiếp trên Máy Trạm & Trích xuất Từ xa qua Liên kết Gián tiếp (Indirect Bridge):
-   - Kết nối trực tiếp hoặc xuyên mạng tự động từ máy kỹ sư (`172.21.*.*`) qua trạm cầu nối
-     Jump-Host (`172.21.168.241` / `172.19.208.133`) tới toàn bộ trạm kiểm thử (`172.19.*.*`)
-     bằng SSH `direct-tcpip` và cơ chế dự phòng tự động WinRM TCP Proxy.
-   - Hỗ trợ nhập nhanh IP rút gọn 2 octet (`116.174` hoặc `116174` -> `172.19.116.174`),
-     tìm kiếm theo 1 hoặc nhiều Serial Number (`SN1, SN2`), và lọc số bản chạy mới nhất (`--latest`).
-   - Cơ chế **Selective Fast Fetch**: Chỉ nén và tải các file văn bản nhẹ cần cho phân tích
-     (`debug.log`, `results.json`, `*.log`, `ctp_log_metadata.yaml`, `job.log`, `enc_logs/*`),
-     bỏ qua các thư mục nặng (`serial_logs/`, `sysinfo/`, `.journal.sqlite`, `results.html`),
-     giúp trích xuất báo cáo từ xa hoàn tất trong 1–3 giây mà không làm đầy ổ cứng.
-   - Hỗ trợ cờ `--keep-raw-zip` để lưu thêm bản `.zip` đầy đủ vào `<App_Dir>/downloads/<IP>/` khi cần.
-2. Lưu Báo cáo Tập trung trong Thư mục Ứng dụng (`<App_Dir>/reports/`):
-   - Toàn bộ báo cáo trích xuất của mọi chế độ (Remote IP+SN, Local Folder/Archive, Batch Scan,
-     CSV Import, Cycle Time) mặc định lưu tập trung tại `<App_Dir>/reports/<Target_SN>/` và
-     `<App_Dir>/reports/Cycle_Time_Summary.csv`.
-3. Hỗ trợ toàn diện 7 chủng loại thiết bị (100% Byte-for-Byte Verified):
-   - Chassis 5U Dell (`SGF...` / `W47DG` / `5U84`): Trích xuất bộ đôi `FW.txt` (21 dòng)
-     và `VPD.txt` (216 dòng).
-   - PSU 5U 0R4C4 (`PMV...` / `0R4C4`) & PSU 2U DYJW5 (`PMV...` / `DYJW5`): Trích xuất
-     báo cáo kết hợp `Controller FW, Drive FW, Serial Number Tracking & Test History.txt`
-     (117 dòng cho 2U DYJW5 / 116 dòng cho 5U 0R4C4) tự động phân định `psu0` (PCM 1) và `psu1` (PCM 2).
-   - IO Controller chuẩn (`SAF...`): Trích xuất `FW.txt` và `VPD.txt` theo `ctrla`/`ctrlb`.
-   - IOM RPC73 (`SAF...` có VPD 49 chứa 'RPC73'): Trích xuất `FW_VPD.txt` (139 dòng).
-   - Chassis 2U (`SGF...`): Trích xuất `<SN>.txt` gồm 4 khối chuẩn.
-   - Chassis 4U Juno (`FVB...`): Trích xuất bộ 6 file tiêu chuẩn (`FW.txt`, `GETVPD.txt`,
-     `VER.txt`, `VPD.txt`, `Restore Default.txt`, `Provisioning State.txt`).
-4. Phân tích Cycle Time, Đọc Trực tiếp File Nén & Tự động Chẩn đoán Lỗi (`ERROR_SUMMARY.txt`):
-   - Tự động bóc tách `Test duration` (Wall-clock Cycle Time), thời gian thực thi
-     Avocado (`results.json`), `Start_Time`, `End_Time`, `Station_ID`, `Employee_ID`,
-     `Part_Number`, `Script_Name`, và số bước `Pass/Fail/Error/Skip`.
-   - Đọc trực tiếp file nén `.zip`, `.tar.gz`, `.tgz`, `.tar.xz` với Selective Stream Extraction.
-   - Khi phát hiện bước test `FAIL`/`ERROR` (bao gồm cả lỗi dừng giữa chừng `VPD rendering failed`),
-     tự động trích xuất báo cáo phần đã chạy kèm `ERROR_SUMMARY.txt`.
-5. Giao diện Tiện ích Windows, Đối soát Mẫu Chuẩn & Xử lý Đa luồng (Multi-threading):
-   - Tích hợp phím tắt `[B]` / `[F]` mở hộp thoại chọn thư mục / file nén Windows gốc,
-     `[O]` mở ngay thư mục báo cáo trong Explorer, `[R]` quay lại Menu chính.
-   - Chế độ `--verify-sample` / Menu `[7]`: Đối chiếu 100% Byte-for-Byte (SHA256, số dòng,
-     unified diff) với thư mục Golden Sample.
-   - Xử lý hàng loạt đa luồng (`--workers`, mặc định 4 luồng).
+TÍNH NỔI BẬT (v1.8.0):
+1. Kiến trúc Module hóa Tinh gọn (`module/`):
+   - Tách biệt rõ ràng 10 submodule chức năng chuyên biệt: `log_io`, `extract_chassis_5u`,
+     `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`,
+     `extract_s1h41`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`,
+     `cli_ui`. Bảo toàn 100% tương thích ngược caller entrypoint và CLI.
+2. Hỗ trợ Dòng Sản Phẩm HPE MSA 2070 (Chuẩn FAIR):
+   - IO Controller `P61070-001`: Trích xuất Section 4 FAIR (`FW.txt` định dạng CLI + `FW_RAW.md`
+     bảng Markdown 2 cột & YAML dump) với 5 lệnh chuẩn từ `test_mfg_restore_default_setting`
+     và post-reset certificates từ `test_restore_defaults_factory_remove_certs`.
+   - Chassis LFF `S1H41-62001`: Trích xuất Section 5 FAIR (`FW.txt` + `FW_RAW.md`) với 6 lệnh
+     chuẩn gồm cả `show license`, đầy đủ 2 Controller A & B, Ports A & B có `Speed(C)`.
+   - Chassis SFF `S3T80-62001`: Trích xuất Section 4 FAIR (`FW.txt` + `FW_RAW.md`) với 7 lệnh
+     chuẩn bao gồm `show fru secrets detail` (`Midplane Information`), 24 Drive Slots SFF,
+     Ports 32Gb.
+3. Hỗ trợ Dell 5U PN 7PNTN & Chuẩn hóa IOM 9D57G:
+   - Dell 5U `7PNTN`: Trích xuất Fan Controller FW (Step 07), Fan VPD 122–126 (Step 06),
+     chuẩn hóa bố cục VPD 260 dòng khớp mẫu chuẩn.
+   - IOM `9D57G`: Nhận diện canister qua VPD 49, giữ bảng validation 140 dòng tới sau
+     `fru_description`, hiển thị chuẩn nhãn `IOM 9D57G` theo tên gói log.
+4. Mở rộng Bộ Kiểm Thử Tự Động (43 Unit Tests Pass):
+   - Mở rộng từ 11 tests lên 43 tests bao phủ đầy đủ tất cả các dòng thiết bị mới và cũ.
+5. Kế thừa Trọn vẹn Phân hệ Kết nối Từ xa & Phân tích Thông minh (v1.7.x):
+   - Kết nối trực tiếp hoặc qua Indirect Bridge `172.21.168.241` -> `172.19.*.*`.
+   - Cơ chế Selective Fast Fetch (1–3 giây), lưu báo cáo tập trung tại `<App_Dir>/reports/<Target_SN>/`.
+   - Bảng kết quả lọc thông minh P/F, phân tích Cycle Time (`Cycle_Time_Summary.csv`),
+     chẩn đoán lỗi tự động (`ERROR_SUMMARY.txt`), đối soát Golden Sample (`--verify-sample`),
+     và xử lý hàng loạt đa luồng (`--workers 4`).
 
 CÔNG NGHỆ SỬ DỤNG:
-- Ngôn ngữ: Python 3.10+ (Tích hợp sẵn `paramiko` trong `python_runtime` Portable).
+- Ngôn ngữ: Python 3.10+ (Tích hợp sẵn `paramiko` và thư viện chuẩn `xml` trong `python_runtime` Portable).
 - Giao diện CLI: ANSI Escape Sequences, Windows Console Virtual Terminal Processing, WinForms Dialogs.
 - Kết nối từ xa: Paramiko SSH / SFTP, Indirect Jump-Host Bridge (`direct-tcpip` & WinRM TCP Proxy).
-- Xử lý nén & đa luồng: zipfile, tarfile, lzma, bz2, threading, queue, hashlib, difflib, json, csv.
+- Xử lý nén & đa luồng: zipfile, tarfile, lzma, bz2, threading, queue, hashlib, difflib, json, csv, xml.etree.
 - Đóng gói: Portable ZIP Package & Ready-to-run Windows Portable Bundle.
 ================================================================================
