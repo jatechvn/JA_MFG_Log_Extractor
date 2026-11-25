@@ -7,6 +7,25 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.8.1] - 2026-11-25
+
+### 🚀 Nâng cấp & Tính năng mới (Features & Enhancements)
+- **Hỗ trợ Dòng Sản phẩm HPE MSA 2070 16Gb FC SFF Chassis (`S1H42-62001`)**:
+  - Thêm module phân tích chuyên biệt [module/extract_s1h42.py](module/extract_s1h42.py) hỗ trợ bóc tách trọn vẹn 8 lệnh FAIR Section-4 (trang 6–24).
+  - Tự động nhận diện PN `S1H42-62001` (`Chas S1H42`) qua metadata hoặc tên gói log, bóc tách `show firmware-bundles`, `show system`, `show license`, `show frus detail`, `show frus secrets` (render `# show frus secrets detail` với 10 trường Midplane Information), `show configuration` (24 SFF slots, ports 16Gb kèm `Speed(A)`/`Speed(C)`), `show advanced-settings` (26 thuộc tính chuẩn, hỗ trợ định dạng dict `Advanced Settings:` hoặc XML fallback), và `show certificates` sau reset cuối cùng (cả 2 controller A & B).
+  - Xuất bộ đôi báo cáo tiêu chuẩn: `FW.txt` (định dạng MSA CLI sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột & dump YAML).
+  - Xác thực chéo target SN với `midplane-serial-number`, `enclosure-sku`, `CHASSIS_MIDPLANE`, `fru-tlasn`, và `fru-oemsn` trước khi ghi báo cáo.
+
+### 🧪 Kiểm thử Tự động & Chất lượng (Testing & Quality)
+- **Mở rộng Bộ Kiểm Thử (51 Unit Tests Pass)**:
+  - Bổ sung [tests/test_s1h42_reports.py](tests/test_s1h42_reports.py) với 8 bài unit test bao phủ toàn diện các ca kiểm thử cho S1H42-62001.
+  - Toàn bộ 51 unit tests đều vượt qua (100% byte-for-byte SHA256 verified) đối chiếu mẫu chuẩn và các ca hồi quy cũ (`P61070-001`, `S1H41-62001`, `S3T80-62001`).
+
+### 📦 Phát hành
+- Đồng bộ phiên bản `v1.8.1` trên toàn bộ mã nguồn, launcher, tài liệu hướng dẫn và bản đóng gói phát hành `dist/`.
+
+---
+
 ## [v1.8.0] - 2026-11-20
 
 ### 🚀 Nâng cấp & Tính năng mới (Features & Enhancements)

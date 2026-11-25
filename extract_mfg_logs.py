@@ -55,6 +55,16 @@ from module.extract_s1h41 import (
     render_s1h41_cli_report,
     render_s1h41_raw_report,
 )
+from module.extract_s1h42 import (
+    S1H42_PART_NUMBER,
+    S1H42_CLI_REPORT_NAME,
+    S1H42_RAW_REPORT_NAME,
+    check_is_s1h42,
+    validate_s1h42_target_sn,
+    extract_s1h42_logs,
+    render_s1h42_cli_report,
+    render_s1h42_raw_report,
+)
 from module.extract_s3t80 import (
     S3T80_PART_NUMBER,
     S3T80_CLI_REPORT_NAME,
@@ -121,7 +131,7 @@ from module.reporting import (
 
 APP_NAME = "JA_MFG_Log_Extractor"
 APP_TITLE = "CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG (IO, CHASSIS & PSU UNITS)"
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.8.1"
 APP_BUILD = "0"
 
 # Enable ANSI escape sequences on Windows console
@@ -315,8 +325,9 @@ def run_cycle_time_analysis(batch_items, output_csv_path=None, diagnose=False):
                      ("Chassis" if first_sn.startswith("SGF") else
                       ("PSU" if first_sn.startswith("PM") else
                        ("Chas S1H41" if check_is_s1h41(logical_name, meta.get("part_number", "")) else
-                        ("Chas S3T80" if check_is_s3t80(logical_name, meta.get("part_number", "")) else
-                         ("IO P61070" if check_is_p61070(logical_name, meta.get("part_number", "")) else "IO"))))))
+                        ("Chas S1H42" if check_is_s1h42(logical_name, meta.get("part_number", "")) else
+                         ("Chas S3T80" if check_is_s3t80(logical_name, meta.get("part_number", "")) else
+                          ("IO P61070" if check_is_p61070(logical_name, meta.get("part_number", "")) else "IO")))))))
                 )
                 print(f"\n  {Color.BRIGHT_CYAN}● Log Unit:{Color.RESET} {Color.WHITE}{logical_name}{Color.RESET}")
                 print(f"    ├─ {Color.GRAY}SN / Part Number :{Color.RESET} {Color.BOLD}{sn_disp}{Color.RESET} (PN: {meta['part_number']})")

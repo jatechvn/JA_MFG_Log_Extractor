@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.8.0-blue)
+![Version](https://img.shields.io/badge/version-1.8.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -17,7 +17,8 @@
 | **Chassis 5U Dell (7PNTN)** | `SGF...` / `7PNTN` | `FW.txt`, `VPD.txt` | Dell 5U Chassis (PN 7PNTN). Trích xuất `FW.txt` (31 dòng: bổ sung 5 cặp Fan Controller từ step 07 trước Sled) và `VPD.txt` (260 dòng: VPD 16 đến 0090, VPD 18 đến 00a0 + 0360/0370, WWN, Customer VPD 18, cùng Fan VPD 122–126 và Canister VPD 48 từ step 06). |
 | **HPE MSA IO Controller** | `P61070-001` (`1VAD4YB...`, `2MXD2YG...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 FC Controller theo Section 4 FAIR. Xuất `FW.txt` (chuẩn CLI 5 lệnh không dính cột) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột và dump YAML lọc theo SN đích). |
 | **HPE MSA Chassis LFF** | `S1H41-62001` (`1VAD4ZB...`, `ACVD1DW...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 FC LFF Chassis theo Section 5 FAIR. Xuất `FW.txt` (đầy đủ 6 lệnh chuẩn, show license, 2 Controller A & B, Ports A & B có `Speed(C)`) và `FW_RAW.md`. |
-| **HPE MSA Chassis SFF** | `S3T80-62001` (`1VAD4ZB...`, `ACVD23W...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 32Gb FC SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (7 lệnh chuẩn gồm `show fru secrets detail` / `Midplane Information`, 24 SFF slots, 32Gb ports) và `FW_RAW.md`. |
+| **HPE MSA Chassis 16Gb SFF** | `S1H42-62001` (`1VAD4ZB...`, `2MXD3DG...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 16Gb FC SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (8 lệnh chuẩn gồm `show frus secrets detail`, 24 SFF slots, 16Gb FC ports, `show advanced-settings`) và `FW_RAW.md`. |
+| **HPE MSA Chassis 32Gb SFF** | `S3T80-62001` (`1VAD4ZB...`, `ACVD23W...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 32Gb FC SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (7 lệnh chuẩn gồm `show fru secrets detail` / `Midplane Information`, 24 SFF slots, 32Gb ports) và `FW_RAW.md`. |
 | **PSU 2U & 5U** | `PMV...` / `DYJW5` / `0R4C4` | `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` | Bóc tách tích hợp 4 phần từ Step 06 (`PCM firmware`, `VPD 40/41 hex diff`) và Step 07 (`VPD 60/61 hex dump`, `Customer VPD validation`). Tự động nhận diện 2U (`DYJW5` 117 dòng) vs 5U (`0R4C4` 116 dòng), phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2). |
 | **IO Controller chuẩn** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
 | **IOM RPC73 / 9D57G** | `SAF...` (VPD 49 chứa `RPC73` / `9D57G`) | `FW_VPD.txt` | Nhận diện Canister ME52XX EBOD. Với log `|3898|`, chọn canister theo SN trong VPD 49; PN `RPC73` và `9D57G` lấy bảng validation đến sau `fru_description` (140 dòng), hiển thị nhãn `IOM 9D57G` theo tên gói log. Log cũ giữ 139 dòng. |
@@ -26,14 +27,16 @@
 
 ---
 
-## 🚀 Tính năng nổi bật (v1.8.0)
+## 🚀 Tính năng nổi bật (v1.8.1)
 
-- 🏗 **Kiến trúc Module hóa Tinh gọn (`module/`)**:
-  - Tách biệt rõ ràng 10 submodule chức năng chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`, `extract_s1h41`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
+- ⚡ **Bổ sung Hỗ trợ HPE MSA 2070 16Gb FC SFF Chassis (`S1H42-62001`)**:
+  - Hỗ trợ toàn diện 8 lệnh FAIR Section-4: `show firmware-bundles`, `show system`, `show license`, `show frus detail`, `show frus secrets detail` (`Midplane Information`), `show configuration` (24 SFF slots, Ports 16Gb), `show certificates` (A & B) và `show advanced-settings` (26 thuộc tính).
+  - Xuất bộ đôi báo cáo: `FW.txt` (định dạng CLI sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột & dump YAML).
+- 🧪 **Mở rộng Bộ Kiểm Thử Tự Động Toàn Diện (51 Unit Tests)**:
+  - Bổ sung 8 unit tests độc lập trong `tests/test_s1h42_reports.py`, nâng tổng số lên 51 tests vượt qua 100% byte-for-byte SHA256.
+- 🏗 **Kiến trúc Module hóa Tinh gọn 11 Submodules (`module/`)**:
+  - Tách biệt rõ ràng 11 submodule chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`, `extract_s1h41`, `extract_s1h42`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
   - Giữ vững 100% khả năng tương thích ngược cho launcher và CLI entrypoint `extract_mfg_logs.py`.
-- ⚡ **Hỗ trợ Dòng Sản phẩm HPE MSA 2070 (Chuẩn FAIR)**:
-  - Bổ sung trọn bộ parser cho `P61070-001` (IO Controller), `S1H41-62001` (Chassis LFF) và `S3T80-62001` (Chassis SFF 32Gb).
-  - Xuất báo cáo kép: `FW.txt` (định dạng CLI tiêu chuẩn sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột và dump dữ liệu chi tiết).
 - 🎯 **Mở rộng Dell 5U PN 7PNTN & Chuẩn hóa IOM 9D57G**:
   - Dell 5U `7PNTN`: Trích xuất Fan Controller FW (Step 07), Fan VPD 122–126 (Step 06), chuẩn hóa bố cục VPD 260 dòng.
   - IOM `9D57G`: Nhận diện canister qua VPD 49, giữ bảng validation 140 dòng tới sau `fru_description`, hiển thị chuẩn nhãn `IOM 9D57G` theo tên gói log.
@@ -107,6 +110,7 @@ JA_MFG_Log_Extractor/
 │   ├── extract_juno.py      # Parser cho Chassis 4U Juno
 │   ├── extract_p61070.py    # Parser cho HPE MSA 2070 FC Controller P61070-001
 │   ├── extract_s1h41.py     # Parser cho HPE MSA 2070 FC LFF Chassis S1H41-62001
+│   ├── extract_s1h42.py     # Parser cho HPE MSA 2070 16Gb FC SFF Chassis S1H42-62001
 │   ├── extract_s3t80.py     # Parser cho HPE MSA 2070 32Gb FC SFF Chassis S3T80-62001
 │   ├── extraction_workflows.py # Điều phối quy trình trích xuất (Local, Remote, Batch)
 │   ├── reporting.py         # Tổng hợp báo cáo, Cycle Time, Golden Sample diff & chẩn đoán
