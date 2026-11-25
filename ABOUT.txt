@@ -3,7 +3,7 @@ CÔNG CỤ TRÍCH XUẤT LOG TỰ ĐỘNG MFG (IO, CHASSIS & PSU UNITS)
 ================================================================================
 Tên dự án      : JA_MFG_Log_Extractor
 Tên ứng dụng   : Manufacturing Log Extractor (IO, IOM RPC73/9D57G, Chassis 2U/4U/5U, PSU 2U/5U & HPE MSA 2070)
-Phiên bản      : 1.8.1
+Phiên bản      : 1.8.2
 Ngày phát hành : 2026-11-25
 Bản quyền      : (C) 2026 JA-Tech System / Foxconn CESBG Vietnam
 
@@ -12,31 +12,33 @@ Công cụ tự động hóa chuyên dụng phục vụ dây chuyền sản xu�
 kiểm thử từ hệ sinh thái log kiểm thử CTP / Avocado thô cho các dòng thiết bị
 Seagate & đối tác Enterprise (IO Controller 2U, IOM RPC73/9D57G, Chassis 2U EBOD,
 Chassis 4U Juno/Oracle, Chassis 5U Dell W47DG/7PNTN, PSU 2U DYJW5 & PSU 5U 0R4C4,
-cùng toàn bộ hệ sinh thái HPE MSA 2070: P61070-001, S1H41-62001, S1H42-62001, S3T80-62001).
+cùng toàn bộ hệ sinh thái HPE MSA 2070: P61070-001, S1H41-62001, S1H42-62001, S1H48-62001, S3T80-62001).
 
-TÍNH NỔI BẬT (v1.8.1):
-1. Bổ sung Hỗ trợ HPE MSA 2070 16Gb FC SFF Chassis (PN S1H42-62001):
-   - Nhận diện tự động qua PN trong metadata hoặc tên gói log (`Chas S1H42`).
+TÍNH NỔI BẬT (v1.8.2):
+1. Bổ sung Hỗ trợ HPE MSA 2070 12Gb SAS SFF Chassis (PN S1H48-62001):
+   - Nhận diện tự động qua PN trong metadata hoặc tên gói log (`Chas S1H48`).
    - Bóc tách toàn diện 8 lệnh FAIR Section-4: `show firmware-bundles`, `show system`,
      `show license`, `show frus detail`, `show frus secrets` (render `# show frus secrets detail`
-     với 10 trường Midplane Information), `show configuration` (24 SFF slots, 16Gb FC ports,
-     `Speed(A)`/`Speed(C)`), `show advanced-settings` (26 thuộc tính chuẩn hệ thống), và
-     `show certificates` sau reset cuối cùng (cả 2 controller A & B).
+     với 10 trường Midplane Information), `show configuration` (với bộ dựng cổng SAS 12Gb chuyên biệt:
+     `Topo(C)`, `Lanes Expected`, `Active Lanes`, `Disabled Lanes` không có `Speed(C)`/SFP,
+     24 SFF slots), `show advanced-settings` (26 thuộc tính chuẩn, hỗ trợ dict & XML fallback),
+     và `show certificates` sau reset cuối cùng (cả 2 controller A & B).
    - Xuất cặp báo cáo chuẩn: `FW.txt` (CLI format sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột & dump YAML).
    - Kiểm tra chéo toàn vẹn target SN qua `midplane-serial-number`, `enclosure-sku`,
      `CHASSIS_MIDPLANE`, `fru-tlasn`, và `fru-oemsn` trước khi ghi báo cáo.
-2. Kiến trúc Module hóa Tinh gọn 11 Submodules (`module/`):
-   - Phân tách rõ ràng 11 submodule chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`,
+2. Kiến trúc Module hóa Tinh gọn 12 Submodules (`module/`):
+   - Phân tách rõ ràng 12 submodule chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`,
      `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`, `extract_s1h41`,
-     `extract_s1h42`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
+     `extract_s1h42`, `extract_s1h48`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
    - Bảo toàn 100% tương thích ngược caller entrypoint và CLI arguments.
-3. Hỗ trợ Toàn Diện 4 Dòng Thiết Bị HPE MSA 2070:
+3. Hỗ trợ Toàn Diện 5 Dòng Thiết Bị HPE MSA 2070:
    - IO Controller `P61070-001` (Section 4 FAIR)
    - Chassis FC LFF `S1H41-62001` (Section 5 FAIR)
    - Chassis 16Gb FC SFF `S1H42-62001` (Section 4 FAIR)
+   - Chassis 12Gb SAS SFF `S1H48-62001` (Section 4 FAIR)
    - Chassis 32Gb FC SFF `S3T80-62001` (Section 4 FAIR)
-4. Mở rộng Bộ Kiểm Thử Tự Động Toàn Diện (51/51 Unit Tests Pass):
-   - Mở rộng lên 51 tests kiểm chứng 100% byte-for-byte SHA256 cho toàn bộ các thiết bị mới và cũ,
+4. Mở rộng Bộ Kiểm Thử Tự Động Toàn Diện (59/59 Unit Tests Pass):
+   - Mở rộng lên 59 tests kiểm chứng 100% byte-for-byte SHA256 cho toàn bộ các thiết bị mới và cũ,
      bảo đảm không có lỗi hồi quy.
 5. Kế thừa Trọn vẹn Phân hệ Kết nối Từ xa & Phân tích Thông minh:
    - Kết nối trực tiếp hoặc qua Indirect Bridge `172.21.168.241` -> `172.19.*.*`.

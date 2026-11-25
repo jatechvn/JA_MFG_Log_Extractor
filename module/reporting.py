@@ -202,6 +202,7 @@ def validate_extracted_reports(unit_type, saved_paths):
         "IO P61070": 2,
         "Chas S1H41": 2,
         "Chas S1H42": 2,
+        "Chas S1H48": 2,
         "Chas S3T80": 2,
         "Chassis": 1,
         "IOM RPC73": 1,

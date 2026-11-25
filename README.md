@@ -1,6 +1,6 @@
 # JA_MFG_Log_Extractor
 
-![Version](https://img.shields.io/badge/version-1.8.1-blue)
+![Version](https://img.shields.io/badge/version-1.8.2-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-orange)
@@ -18,6 +18,7 @@
 | **HPE MSA IO Controller** | `P61070-001` (`1VAD4YB...`, `2MXD2YG...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 FC Controller theo Section 4 FAIR. Xuất `FW.txt` (chuẩn CLI 5 lệnh không dính cột) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột và dump YAML lọc theo SN đích). |
 | **HPE MSA Chassis LFF** | `S1H41-62001` (`1VAD4ZB...`, `ACVD1DW...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 FC LFF Chassis theo Section 5 FAIR. Xuất `FW.txt` (đầy đủ 6 lệnh chuẩn, show license, 2 Controller A & B, Ports A & B có `Speed(C)`) và `FW_RAW.md`. |
 | **HPE MSA Chassis 16Gb SFF** | `S1H42-62001` (`1VAD4ZB...`, `2MXD3DG...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 16Gb FC SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (8 lệnh chuẩn gồm `show frus secrets detail`, 24 SFF slots, 16Gb FC ports, `show advanced-settings`) và `FW_RAW.md`. |
+| **HPE MSA Chassis 12Gb SAS SFF** | `S1H48-62001` (`1VAD4ZB...`, `2MXD3DG...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 12Gb SAS SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (8 lệnh chuẩn, controller P61073-001, ports SAS 12Gb kèm Lanes, 24 SFF slots, `show advanced-settings`) và `FW_RAW.md`. |
 | **HPE MSA Chassis 32Gb SFF** | `S3T80-62001` (`1VAD4ZB...`, `ACVD23W...`) | `FW.txt`, `FW_RAW.md` | HPE MSA 2070 32Gb FC SFF Chassis theo Section 4 FAIR. Xuất `FW.txt` (7 lệnh chuẩn gồm `show fru secrets detail` / `Midplane Information`, 24 SFF slots, 32Gb ports) và `FW_RAW.md`. |
 | **PSU 2U & 5U** | `PMV...` / `DYJW5` / `0R4C4` | `Controller FW, Drive FW, Serial Number Tracking & Test History.txt` | Bóc tách tích hợp 4 phần từ Step 06 (`PCM firmware`, `VPD 40/41 hex diff`) và Step 07 (`VPD 60/61 hex dump`, `Customer VPD validation`). Tự động nhận diện 2U (`DYJW5` 117 dòng) vs 5U (`0R4C4` 116 dòng), phân định `psu0` (PCM 1) hoặc `psu1` (PCM 2). |
 | **IO Controller chuẩn** | `SAF...` | `FW.txt`, `VPD.txt` | Tự động phân tích vai trò `ctrla` / `ctrlb` dựa theo thứ tự xuất hiện của SN trong tên thư mục. |
@@ -27,15 +28,15 @@
 
 ---
 
-## 🚀 Tính năng nổi bật (v1.8.1)
+## 🚀 Tính năng nổi bật (v1.8.2)
 
-- ⚡ **Bổ sung Hỗ trợ HPE MSA 2070 16Gb FC SFF Chassis (`S1H42-62001`)**:
-  - Hỗ trợ toàn diện 8 lệnh FAIR Section-4: `show firmware-bundles`, `show system`, `show license`, `show frus detail`, `show frus secrets detail` (`Midplane Information`), `show configuration` (24 SFF slots, Ports 16Gb), `show certificates` (A & B) và `show advanced-settings` (26 thuộc tính).
+- ⚡ **Bổ sung Hỗ trợ HPE MSA 2070 12Gb SAS SFF Chassis (`S1H48-62001`)**:
+  - Hỗ trợ toàn diện 8 lệnh FAIR Section-4: `show firmware-bundles`, `show system`, `show license`, `show frus detail`, `show frus secrets detail` (`Midplane Information`), `show configuration` (bộ dựng cổng SAS 12Gb chuyên biệt với `Topo(C)`, `Lanes Expected`, `Active Lanes`, `Disabled Lanes` không có `Speed(C)`/SFP, 24 SFF slots), `show certificates` (A & B) và `show advanced-settings` (26 thuộc tính).
   - Xuất bộ đôi báo cáo: `FW.txt` (định dạng CLI sạch) và `FW_RAW.md` (bảng Markdown `Versions` 2 cột & dump YAML).
-- 🧪 **Mở rộng Bộ Kiểm Thử Tự Động Toàn Diện (51 Unit Tests)**:
-  - Bổ sung 8 unit tests độc lập trong `tests/test_s1h42_reports.py`, nâng tổng số lên 51 tests vượt qua 100% byte-for-byte SHA256.
-- 🏗 **Kiến trúc Module hóa Tinh gọn 11 Submodules (`module/`)**:
-  - Tách biệt rõ ràng 11 submodule chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`, `extract_s1h41`, `extract_s1h42`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
+- 🧪 **Mở rộng Bộ Kiểm Thử Tự Động Toàn Diện (59 Unit Tests)**:
+  - Bổ sung 8 unit tests độc lập trong `tests/test_s1h48_reports.py`, nâng tổng số lên 59 tests vượt qua 100% byte-for-byte SHA256.
+- 🏗 **Kiến trúc Module hóa Tinh gọn 12 Submodules (`module/`)**:
+  - Tách biệt rõ ràng 12 submodule chuyên biệt: `log_io`, `extract_chassis_5u`, `extract_rpc73`, `extract_psu`, `extract_juno`, `extract_basic`, `extract_p61070`, `extract_s1h41`, `extract_s1h42`, `extract_s1h48`, `extract_s3t80`, `reporting`, `console_style`, `extraction_workflows`, `cli_ui`.
   - Giữ vững 100% khả năng tương thích ngược cho launcher và CLI entrypoint `extract_mfg_logs.py`.
 - 🎯 **Mở rộng Dell 5U PN 7PNTN & Chuẩn hóa IOM 9D57G**:
   - Dell 5U `7PNTN`: Trích xuất Fan Controller FW (Step 07), Fan VPD 122–126 (Step 06), chuẩn hóa bố cục VPD 260 dòng.
@@ -111,6 +112,7 @@ JA_MFG_Log_Extractor/
 │   ├── extract_p61070.py    # Parser cho HPE MSA 2070 FC Controller P61070-001
 │   ├── extract_s1h41.py     # Parser cho HPE MSA 2070 FC LFF Chassis S1H41-62001
 │   ├── extract_s1h42.py     # Parser cho HPE MSA 2070 16Gb FC SFF Chassis S1H42-62001
+│   ├── extract_s1h48.py     # Parser cho HPE MSA 2070 12Gb SAS SFF Chassis S1H48-62001
 │   ├── extract_s3t80.py     # Parser cho HPE MSA 2070 32Gb FC SFF Chassis S3T80-62001
 │   ├── extraction_workflows.py # Điều phối quy trình trích xuất (Local, Remote, Batch)
 │   ├── reporting.py         # Tổng hợp báo cáo, Cycle Time, Golden Sample diff & chẩn đoán
@@ -122,7 +124,7 @@ JA_MFG_Log_Extractor/
 │   ├── ip_utils.py          # Chuẩn hóa IP rút gọn (116.174 / 116174 -> 172.19.116.174)
 │   ├── winrm_socket.py      # Socket-like adapter cho WinRM Bridge
 │   └── winrm_bridge.ps1     # Kịch bản PowerShell TCP Bridge trên trạm trung gian
-├── tests/                   # Bộ 43 kiểm thử tự động toàn diện
+├── tests/                   # Bộ 59 kiểm thử tự động toàn diện
 ├── config_sample.json       # Mẫu cấu hình kết nối từ xa (sao chép thành config.json)
 ├── Chay_Tool_Log.bat        # Trình khởi chạy thích ứng Windows
 ├── mau_danh_sach_log.csv    # File CSV mẫu cho chế độ xử lý hàng loạt
