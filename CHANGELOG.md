@@ -7,6 +7,28 @@ và tuân thủ chuẩn [Semantic Versioning](https://semver.org/lang/vi/).
 
 ---
 
+## [v1.8.3] - 2026-11-28
+
+### 🚀 Nâng cấp & Tính năng mới (Features & Enhancements)
+- **Hỗ trợ Dòng Sản phẩm HPE MSA 2070 10/25GbE iSCSI SFF Chassis (`S1H44-62001`)**:
+  - Thêm module phân tích chuyên biệt [module/extract_s1h44.py](module/extract_s1h44.py) hỗ trợ bóc tách trọn vẹn 8 lệnh FAIR Section-4 (trang 5–25).
+  - Tự động nhận diện PN `S1H44-62001` (`Chas S1H44`, `Product ID: MSA 2070 iSCSI`, controller `P61071-001`), sử dụng bộ dựng cổng iSCSI chuyên biệt `_render_ports_iscsi_s1h44()` (`Speed(A)`/`Speed(C)` + khối 11 trường `Port Details` cho từng cổng) và 24 SFF drive slots.
+  - Neo dòng `<RESPONSE ...>` trong `_parse_last_xml_command_s1h44()` để phân tách chuẩn xác khối XML `show certificates` sau reset.
+- **Hỗ trợ Dòng Sản phẩm HPE MSA 2070 12Gb SAS LFF Chassis (`S1H47-62001`)**:
+  - Thêm module phân tích chuyên biệt [module/extract_s1h47.py](module/extract_s1h47.py) hỗ trợ bóc tách trọn vẹn 8 lệnh FAIR Section-4 (trang 6–22).
+  - Tự động nhận diện PN `S1H47-62001` (`Chas S1H47`, `Product ID: MSA 2070 SAS`, midplane `P62783-001`, controller `P61073-001`), hỗ trợ cổng SAS 12Gb kèm Lanes (`Topo(C)`, `Lanes Expected`, `Active Lanes`, `Disabled Lanes`) và 12 LFF drive slots (`MSA2070-ENCL-LFF`/`2U12-12Gv3`).
+- Cả 2 dòng đều xuất cặp báo cáo chuẩn `FW.txt` và `FW_RAW.md` (bảng Markdown `Versions` 2 cột & dump YAML), xác thực chéo target SN qua `midplane-serial-number`, `enclosure-sku`, `CHASSIS_MIDPLANE`, `fru-tlasn`, và `fru-oemsn`.
+
+### 🧪 Kiểm thử Tự động & Chất lượng (Testing & Quality)
+- **Mở rộng Bộ Kiểm Thử (75 Unit Tests Pass)**:
+  - Bổ sung [tests/test_s1h44_reports.py](tests/test_s1h44_reports.py) (8 tests) và [tests/test_s1h47_reports.py](tests/test_s1h47_reports.py) (8 tests).
+  - Toàn bộ 75 unit tests đều vượt qua (100% byte-for-byte SHA256 verified) đối chiếu mẫu chuẩn và các ca hồi quy cũ (`P61070-001`, `S1H41-62001`, `S1H42-62001`, `S1H48-62001`, `S3T80-62001`).
+
+### 📦 Phát hành
+- Đồng bộ phiên bản `v1.8.3` trên toàn bộ mã nguồn, launcher, tài liệu hướng dẫn và bản đóng gói phát hành `dist/`.
+
+---
+
 ## [v1.8.2] - 2026-11-25
 
 ### 🚀 Nâng cấp & Tính năng mới (Features & Enhancements)

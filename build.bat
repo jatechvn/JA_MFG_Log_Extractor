@@ -3,11 +3,11 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 echo ===============================================================================
-echo   DONG GOI BAN PHAT HANH JA_MFG_Log_Extractor v1.8.2
+echo   DONG GOI BAN PHAT HANH JA_MFG_Log_Extractor v1.8.3
 echo ===============================================================================
 
 set "APP_NAME=JA_MFG_Log_Extractor"
-set "APP_VERSION=1.8.2"
+set "APP_VERSION=1.8.3"
 set "ZIP_NAME=%APP_NAME%_v%APP_VERSION%_Windows_x64.zip"
 set "DIST_DIR=%~dp0dist"
 set "PACK_DIR=%~dp0dist_pack\%APP_NAME%_v%APP_VERSION%_Windows_x64"

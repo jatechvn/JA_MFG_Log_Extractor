@@ -30,6 +30,18 @@ from .extract_s1h42 import (
     check_is_s1h42,
     extract_s1h42_logs,
 )
+from .extract_s1h44 import (
+    S1H44_CLI_REPORT_NAME,
+    S1H44_RAW_REPORT_NAME,
+    check_is_s1h44,
+    extract_s1h44_logs,
+)
+from .extract_s1h47 import (
+    S1H47_CLI_REPORT_NAME,
+    S1H47_RAW_REPORT_NAME,
+    check_is_s1h47,
+    extract_s1h47_logs,
+)
 from .extract_s1h48 import (
     S1H48_CLI_REPORT_NAME,
     S1H48_RAW_REPORT_NAME,
@@ -115,14 +127,16 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw, qui
         part_number = cycle_meta['part_number'].strip().upper()
         is_chassis_s1h41 = check_is_s1h41(folder_name, part_number)
         is_chassis_s1h42 = check_is_s1h42(folder_name, part_number)
+        is_chassis_s1h44 = check_is_s1h44(folder_name, part_number)
+        is_chassis_s1h47 = check_is_s1h47(folder_name, part_number)
         is_chassis_s1h48 = check_is_s1h48(folder_name, part_number)
         is_chassis_s3t80 = check_is_s3t80(folder_name, part_number)
-        is_chassis_5u_dell = not is_chassis_s1h41 and not is_chassis_s1h42 and not is_chassis_s1h48 and not is_chassis_s3t80 and (part_number == "7PNTN" or (
+        is_chassis_5u_dell = not is_chassis_s1h41 and not is_chassis_s1h42 and not is_chassis_s1h44 and not is_chassis_s1h47 and not is_chassis_s1h48 and not is_chassis_s3t80 and (part_number == "7PNTN" or (
             (target_sn.startswith("SGF") or "W47DG" in folder_name or "5U_Dell" in folder_name or "5U84" in folder_name)
             and check_is_chassis_5u_dell(test_results_dir, folder_name, part_number)
         ))
-        is_chassis_2u = not is_chassis_s1h41 and not is_chassis_s1h42 and not is_chassis_s1h48 and not is_chassis_s3t80 and target_sn.startswith("SGF") and not is_chassis_5u_dell
-        is_chassis = is_chassis_2u or is_chassis_4u or is_chassis_5u_dell or is_chassis_s1h41 or is_chassis_s1h42 or is_chassis_s1h48 or is_chassis_s3t80
+        is_chassis_2u = not is_chassis_s1h41 and not is_chassis_s1h42 and not is_chassis_s1h44 and not is_chassis_s1h47 and not is_chassis_s1h48 and not is_chassis_s3t80 and target_sn.startswith("SGF") and not is_chassis_5u_dell
+        is_chassis = is_chassis_2u or is_chassis_4u or is_chassis_5u_dell or is_chassis_s1h41 or is_chassis_s1h42 or is_chassis_s1h44 or is_chassis_s1h47 or is_chassis_s1h48 or is_chassis_s3t80
 
         unit_type = "-"
         controller = "-"
@@ -199,6 +213,44 @@ def process_single_extraction(input_dir_raw, target_sn_raw, output_base_raw, qui
             write_extracted_file(raw_out_path, raw_lines, trim_last_newline=True)
             saved_paths.append(raw_out_path)
             log_print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {S1H42_RAW_REPORT_NAME} ({len(raw_lines)} dòng) tại:{Color.RESET}")
+            log_print(f"  {Color.BOLD}{Color.WHITE}➜ {raw_out_path}{Color.RESET}")
+
+        elif is_chassis_s1h44:
+            cli_lines, raw_lines = extract_s1h44_logs(test_results_dir, target_sn)
+            out_dir, _ = resolve_output_paths(output_base_raw, target_sn, is_chassis=False, unit_root=logical_unit_root)
+            unit_type = "Chas S1H44"
+            controller = "-"
+            log_print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ CHASSIS HPE MSA S1H44-62001]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng SP: {Color.MAGENTA}Chas S1H44 (MSA 2070 10/25GbE iSCSI SFF){Color.RESET} │ Cycle Time: {Color.BRIGHT_YELLOW}{cycle_meta['cycle_time_short']}{Color.RESET}")
+
+            fw_out_path = os.path.join(out_dir, S1H44_CLI_REPORT_NAME)
+            write_extracted_file(fw_out_path, cli_lines, trim_last_newline=True)
+            saved_paths.append(fw_out_path)
+            log_print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {S1H44_CLI_REPORT_NAME} ({len(cli_lines)} dòng) tại:{Color.RESET}")
+            log_print(f"  {Color.BOLD}{Color.WHITE}➜ {fw_out_path}{Color.RESET}")
+
+            raw_out_path = os.path.join(out_dir, S1H44_RAW_REPORT_NAME)
+            write_extracted_file(raw_out_path, raw_lines, trim_last_newline=True)
+            saved_paths.append(raw_out_path)
+            log_print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {S1H44_RAW_REPORT_NAME} ({len(raw_lines)} dòng) tại:{Color.RESET}")
+            log_print(f"  {Color.BOLD}{Color.WHITE}➜ {raw_out_path}{Color.RESET}")
+
+        elif is_chassis_s1h47:
+            cli_lines, raw_lines = extract_s1h47_logs(test_results_dir, target_sn)
+            out_dir, _ = resolve_output_paths(output_base_raw, target_sn, is_chassis=False, unit_root=logical_unit_root)
+            unit_type = "Chas S1H47"
+            controller = "-"
+            log_print(f"\n{Color.BRIGHT_CYAN}⚡ [XỬ LÝ CHASSIS HPE MSA S1H47-62001]{Color.RESET} Target SN: {Color.BOLD}{Color.WHITE}{target_sn}{Color.RESET} │ Dòng SP: {Color.MAGENTA}Chas S1H47 (MSA 2070 12Gb SAS LFF){Color.RESET} │ Cycle Time: {Color.BRIGHT_YELLOW}{cycle_meta['cycle_time_short']}{Color.RESET}")
+
+            fw_out_path = os.path.join(out_dir, S1H47_CLI_REPORT_NAME)
+            write_extracted_file(fw_out_path, cli_lines, trim_last_newline=True)
+            saved_paths.append(fw_out_path)
+            log_print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {S1H47_CLI_REPORT_NAME} ({len(cli_lines)} dòng) tại:{Color.RESET}")
+            log_print(f"  {Color.BOLD}{Color.WHITE}➜ {fw_out_path}{Color.RESET}")
+
+            raw_out_path = os.path.join(out_dir, S1H47_RAW_REPORT_NAME)
+            write_extracted_file(raw_out_path, raw_lines, trim_last_newline=True)
+            saved_paths.append(raw_out_path)
+            log_print(f"{Color.BRIGHT_GREEN}✔ Đã lưu {S1H47_RAW_REPORT_NAME} ({len(raw_lines)} dòng) tại:{Color.RESET}")
             log_print(f"  {Color.BOLD}{Color.WHITE}➜ {raw_out_path}{Color.RESET}")
 
         elif is_chassis_s1h48:
@@ -361,7 +413,7 @@ def detect_sns_from_folder(folder_path):
     if not matches:
         matches = re.findall(r'[A-Z0-9]{14,}', folder_name)
     pkg_pn = get_log_package_pn(folder_name)
-    if not matches and pkg_pn in ("P61070-001", "S1H41-62001", "S1H42-62001", "S1H48-62001", "S3T80-62001"):
+    if not matches and pkg_pn in ("P61070-001", "S1H41-62001", "S1H42-62001", "S1H44-62001", "S1H47-62001", "S1H48-62001", "S3T80-62001"):
         m_after = re.search(r'_' + re.escape(pkg_pn) + r'_(.+)$', folder_name, re.IGNORECASE)
         if m_after:
             tail = re.sub(r'_\d{8}-\d{6}.*$', '', m_after.group(1))
@@ -856,7 +908,7 @@ def run_batch_extraction(
                 "sn": target_sn,
                 "source_target": log_path,
                 "output_base": output_base,
-                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis 5U" if ("W47DG" in log_path or "5U_Dell" in log_path or "5U84" in log_path) else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else ("Chas S1H41" if check_is_s1h41(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H42" if check_is_s1h42(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H48" if check_is_s1h48(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S3T80" if check_is_s3t80(os.path.basename(log_path.rstrip("\\/"))) else ("IO P61070" if check_is_p61070(os.path.basename(log_path.rstrip("\\/"))) else "IO")))))))),
+                "unit_type": "Chassis 4U" if target_sn.startswith("FVB") else ("Chassis 5U" if ("W47DG" in log_path or "5U_Dell" in log_path or "5U84" in log_path) else ("Chassis" if target_sn.startswith("SGF") else ("PSU" if target_sn.startswith("PM") else ("Chas S1H41" if check_is_s1h41(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H42" if check_is_s1h42(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H44" if check_is_s1h44(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H47" if check_is_s1h47(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S1H48" if check_is_s1h48(os.path.basename(log_path.rstrip("\\/"))) else ("Chas S3T80" if check_is_s3t80(os.path.basename(log_path.rstrip("\\/"))) else ("IO P61070" if check_is_p61070(os.path.basename(log_path.rstrip("\\/"))) else "IO")))))))))),
                 "controller": "-",
                 "status": "FAIL",
                 "error": str(e),

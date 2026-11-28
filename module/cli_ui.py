@@ -9,6 +9,8 @@ from .console_style import Color
 from .extract_p61070 import check_is_p61070
 from .extract_s1h41 import check_is_s1h41
 from .extract_s1h42 import check_is_s1h42
+from .extract_s1h44 import check_is_s1h44
+from .extract_s1h47 import check_is_s1h47
 from .extract_s1h48 import check_is_s1h48
 from .extract_s3t80 import check_is_s3t80
 from .extraction_workflows import detect_sns_from_folder, process_single_extraction
@@ -941,7 +943,7 @@ def run_interactive_menu_once(
         if detected_sns:
             if len(detected_sns) == 1 or detected_sns[0].startswith("SGF"):
                 sn_item = detected_sns[0]
-                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis 5U" if ("W47DG" in input_dir or "5U_Dell" in input_dir or "5U84" in input_dir) else ("Chassis" if sn_item.startswith("SGF") else ("PSU" if sn_item.startswith("PM") else ("Chas S1H41" if check_is_s1h41(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H42" if check_is_s1h42(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H48" if check_is_s1h48(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S3T80" if check_is_s3t80(os.path.basename(input_dir.rstrip("\\/"))) else ("IO P61070" if check_is_p61070(os.path.basename(input_dir.rstrip("\\/"))) else "IO"))))))))
+                unit_tag = "Chassis 4U" if sn_item.startswith("FVB") else ("Chassis 5U" if ("W47DG" in input_dir or "5U_Dell" in input_dir or "5U84" in input_dir) else ("Chassis" if sn_item.startswith("SGF") else ("PSU" if sn_item.startswith("PM") else ("Chas S1H41" if check_is_s1h41(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H42" if check_is_s1h42(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H44" if check_is_s1h44(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H47" if check_is_s1h47(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S1H48" if check_is_s1h48(os.path.basename(input_dir.rstrip("\\/"))) else ("Chas S3T80" if check_is_s3t80(os.path.basename(input_dir.rstrip("\\/"))) else ("IO P61070" if check_is_p61070(os.path.basename(input_dir.rstrip("\\/"))) else "IO"))))))))))
                 print(f"\n{Color.BRIGHT_YELLOW}⚡ [TỰ ĐỘNG CHỌN SN {unit_tag.upper()}]:{Color.RESET} {Color.BOLD}{Color.WHITE}{sn_item}{Color.RESET}")
                 target_sn_raw = sn_item
             else:
